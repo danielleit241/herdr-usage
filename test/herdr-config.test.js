@@ -67,8 +67,8 @@ test("addBlock appends the block with its own header when the table is missing",
   assert.equal(
     keyLine(text, "claude"),
     'claude = [["state_icon", "machine", "workspace", "tab"], [{ token = "$herdr_usage_icon", fg = "#D97757" }, "agent"], ' +
-      '[{ token = "$herdr_usage_1", rules = [{ starts_with = "●", fg = "#f38ba8" }, { starts_with = "◐", fg = "#f9e2af" }, { starts_with = "○", fg = "#a6e3a1" }] }, ' +
-      '{ token = "$herdr_usage_2", rules = [{ starts_with = "●", fg = "#f38ba8" }, { starts_with = "◐", fg = "#f9e2af" }, { starts_with = "○", fg = "#a6e3a1" }] }]]',
+      '[{ token = "$herdr_usage_1", rules = [{ starts_with = "●", fg = "#f38ba8" }, { starts_with = "◐", fg = "#f9e2af" }, { starts_with = "○", fg = "#a6e3a1" }] }], ' +
+      '[{ token = "$herdr_usage_2", rules = [{ starts_with = "●", fg = "#f38ba8" }, { starts_with = "◐", fg = "#f9e2af" }, { starts_with = "○", fg = "#a6e3a1" }] }]]',
   );
   assert.match(keyLine(text, "codex"), /fg = "#7A9DFF"/);
 });
@@ -114,7 +114,7 @@ test("addBlock: the icon is left out when disabled, or when there is no agent el
 
 test("addBlock: no theme colors gives plain usage tokens without rules", () => {
   const { text } = add("", { colors: null });
-  assert.match(keyLine(text, "claude"), /\["\$herdr_usage_1", "\$herdr_usage_2"\]\]$/);
+  assert.match(keyLine(text, "claude"), /\["\$herdr_usage_1"\], \["\$herdr_usage_2"\]\]$/);
   assert.ok(!text.includes("starts_with"));
   // one color missing: also plain, a rule needs all three
   assert.ok(!add("", { colors: { ...CATPPUCCIN, red: null } }).text.includes("starts_with"));

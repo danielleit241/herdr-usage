@@ -1,3 +1,5 @@
+// Reset times render in local time: pin it.
+process.env.TZ = "UTC";
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -14,10 +16,12 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "herdr-usage-"));
 
 const ok = (provider, windows) => ({ provider, status: "ok", windows, observedAt: NOW });
 const values = (state, now = NOW) => windowTokens(state, now).map((t) => t && t.value);
+// Glyph, label and percent only: the reader tests do not care about reset times.
+const levels = (state, now = NOW) => values(state, now).map((v) => v && v.split(" ").slice(0, 3).join(" "));
 
 test("windowLabel maps codex window minutes", () => {
   assert.equal(windowLabel(300), "5h");
-  assert.equal(windowLabel(10080), "wk");
+  assert.equal(windowLabel(10080), "Wk");
   assert.equal(windowLabel(1440), "1d");
 });
 
@@ -31,12 +35,22 @@ test("windowTokens renders one token per slot and drops reset windows", () => {
     { label: "wk", usedPercent: 85, resetsAt: NOW + 1000 },
   ]);
   assert.deepEqual(windowTokens(state, NOW), [
-    { value: "○ 5h 34%", ttlMs: 100_000 },
-    { value: "● wk 85%", ttlMs: 1_000_000 },
+    { value: "○ 5h 34% 11:35", ttlMs: 100_000 },
+    { value: "● wk 85% 11:50", ttlMs: 1_000_000 },
   ]);
-  assert.deepEqual(values(state, NOW + 200), [null, "● wk 85%"]);
+  assert.deepEqual(values(state, NOW + 200), [null, "● wk 85% 11:50"]);
   assert.deepEqual(values(state, NOW + 2000), [null, null]);
   assert.deepEqual(values({ provider: "claude", status: "unavailable", windows: [] }), [null, null]);
+});
+
+test("windowTokens names the weekday only for resets more than 24h away", () => {
+  const state = ok("claude", [
+    { label: "5h", usedPercent: 1, resetsAt: NOW + 86_400 },
+    { label: "Wk", usedPercent: 1, resetsAt: NOW + 3 * 86_400 },
+  ]);
+  // NOW is Mon 2026-10-05 11:33 UTC.
+  assert.deepEqual(values(state), ["○ 5h 1% 11:33", "○ Wk 1% Thu 11:33"]);
+  assert.deepEqual(values(ok("codex", [{ label: "5h", usedPercent: 1, resetsAt: null }])), ["○ 5h 1%", null]);
 });
 
 test("windowTokens caps TTL at 24h", () => {
@@ -56,7 +70,7 @@ test("claude: statusLine payload round-trips through the cache", () => {
   assert.equal(claude.cacheFromStatusLine(payload, cache, NOW), true);
   assert.deepEqual(claude.readCache(cache), ok("claude", [
     { label: "5h", usedPercent: 12.5, resetsAt: NOW + 3600 },
-    { label: "wk", usedPercent: 40, resetsAt: NOW + 86400 },
+    { label: "Wk", usedPercent: 40, resetsAt: NOW + 86400 },
   ]));
 });
 
@@ -102,7 +116,7 @@ test("codex: newest rollout's last rate_limits wins", () => {
   writeRollout(home, "05", "rollout-b.jsonl", [tokenCount(10, 20), "{truncated", tokenCount(34, 55)], NOW);
   const state = codex.readSessions(home);
   assert.equal(state.status, "ok");
-  assert.deepEqual(values(state), ["○ 5h 34%", "◐ wk 55%"]);
+  assert.deepEqual(levels(state), ["○ 5h 34%", "◐ Wk 55%"]);
   assert.equal(state.observedAt, Math.floor(Date.parse("2026-10-05T10:00:00.000Z") / 1000));
 });
 
@@ -110,7 +124,7 @@ test("codex: falls back to an older rollout when the newest has no rate_limits",
   const home = tmp();
   writeRollout(home, "05", "rollout-a.jsonl", [tokenCount(1, 2)], NOW - 50);
   writeRollout(home, "05", "rollout-b.jsonl", [{ type: "session_meta", payload: {} }], NOW);
-  assert.deepEqual(values(codex.readSessions(home)), ["○ 5h 1%", "○ wk 2%"]);
+  assert.deepEqual(levels(codex.readSessions(home)), ["○ 5h 1%", "○ Wk 2%"]);
 });
 
 test("codex: ignores rate limit buckets other than the main one", () => {
@@ -118,14 +132,14 @@ test("codex: ignores rate limit buckets other than the main one", () => {
   const premium = tokenCount(99, 99);
   premium.payload.rate_limits.limit_id = "premium";
   writeRollout(home, "05", "rollout-a.jsonl", [tokenCount(34, 55), premium], NOW);
-  assert.deepEqual(values(codex.readSessions(home)), ["○ 5h 34%", "◐ wk 55%"]);
+  assert.deepEqual(levels(codex.readSessions(home)), ["○ 5h 34%", "◐ Wk 55%"]);
 });
 
 test("codex: considers a session from the previous day directory", () => {
   const home = tmp();
   for (let i = 0; i < 6; i++) writeRollout(home, "05", `rollout-new-${i}.jsonl`, [{ type: "x" }], NOW - 100);
   writeRollout(home, "04", "rollout-old.jsonl", [tokenCount(1, 2)], NOW);
-  assert.deepEqual(values(codex.readSessions(home)), ["○ 5h 1%", "○ wk 2%"]);
+  assert.deepEqual(levels(codex.readSessions(home)), ["○ 5h 1%", "○ Wk 2%"]);
 });
 
 test("claude: an idle pane's older reading never replaces a newer one", () => {
@@ -166,7 +180,7 @@ test("planReports shows each provider once and clears the other panes", () => {
     { pane_id: "c1", agent: "claude", tokens: { herdr_usage_2: "○ wk 1%" } },
     { pane_id: "c2", agent: "claude", tokens: { herdr_usage_1: "○ 5h 10%" } },
     { pane_id: "c3", agent: "claude" },
-    { pane_id: "x1", agent: "codex", tokens: { herdr_usage_1: "◐ 5h 60%" } },
+    { pane_id: "x1", agent: "codex", tokens: { herdr_usage_1: "◐ 5h 60% 11:34" } },
     { pane_id: "x2", agent: "codex" },
     { pane_id: "p1", agent: "pi" },
     { pane_id: "p2", agent: "pi", tokens: { herdr_usage_1: "○ 5h 9%" } }, // was a claude pane
@@ -175,7 +189,7 @@ test("planReports shows each provider once and clears the other panes", () => {
     {
       paneId: "c1",
       set: [
-        { name: "herdr_usage_1", value: "○ 5h 10%", ttlMs: 60_000 },
+        { name: "herdr_usage_1", value: "○ 5h 10% 11:34", ttlMs: 60_000 },
         { name: "herdr_usage_icon", value: ICONS.claude, ttlMs: 60_000 },
       ],
       clear: ["herdr_usage_2"],
@@ -184,7 +198,7 @@ test("planReports shows each provider once and clears the other panes", () => {
     {
       paneId: "x1",
       set: [
-        { name: "herdr_usage_2", value: "● wk 90%", ttlMs: 90_000 },
+        { name: "herdr_usage_2", value: "● wk 90% 11:34", ttlMs: 90_000 },
         { name: "herdr_usage_icon", value: ICONS.codex, ttlMs: 90_000 },
       ],
       clear: [],

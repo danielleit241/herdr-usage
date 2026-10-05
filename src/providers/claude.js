@@ -15,7 +15,7 @@ const { unavailable, toWindow } = require("../usage");
 
 const WINDOWS = [
   ["five_hour", "5h"],
-  ["seven_day", "wk"],
+  ["seven_day", "Wk"],
 ];
 const SAME_WINDOW_SEC = 60;
 

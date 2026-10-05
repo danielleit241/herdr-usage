@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Sidebar: each usage window has its own row with its local reset time
+  (`○ 5h 38% 19:15`, `○ Wk 19% Mon 19:15`); the weekday shows when the reset is more
+  than 24 hours away. The weekly label is now `Wk`.
 - Install: `herdr plugin install danielleit241/herdr-usage` now sets everything up. A
   second `[[build]]` command (`node src/cli.js setup --build`) installs the logo font,
   writes the hook launcher, wires the Claude Code and Codex hooks and adds the sidebar

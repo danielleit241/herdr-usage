@@ -2,21 +2,24 @@
 
 A [herdr](https://github.com/herdrdev/herdr) plugin that shows the subscription usage of
 your AI coding agents (for example 5-hour and weekly windows) in the agents sidebar,
-once per provider, colored by level:
+once per provider, colored by level, with the local time when each window resets:
 
 ```
 ● local · app · main
   claude
-  ○ 5h 21% · ○ wk 28%       ← first agent of a provider only
+  ○ 5h 38% 19:15            ← first agent of a provider only
+  ○ Wk 19% Mon 19:15
 ● local · app · main
   claude
 ● local · api · main
   codex
-  ○ 5h 38% · ◐ wk 56%
+  ○ 5h 37% 01:36
+  ◐ Wk 64% Sat 06:52
 ```
 
 `○` under 50 %, `◐` 50–79 %, `●` 80 % and over. The sidebar colors them green, yellow
-and red; the glyph alone also shows the level.
+and red; the glyph alone also shows the level. A reset more than 24 hours away also
+shows the weekday.
 
 Works on Windows, macOS and Linux. No dependencies beyond Node.js 18+.
 
@@ -115,8 +118,8 @@ not stop the others.
   `# >>> herdr-usage ...` and `# <<< herdr-usage`, with one `rows_by_agent` entry per
   provider:
   - It starts from your own rows (`[ui.sidebar.agents] rows`), or from herdr's default
-    rows when you have none. It adds the logo in front of `agent`, and one row with
-    the two usage tokens.
+    rows when you have none. It adds the logo in front of `agent`, and one row per
+    usage window.
   - The usage colors are the green, yellow and red of your theme: the built-in palette
     of `[theme] name`, with your `[theme.custom]` values on top. With the `terminal`
     theme (ANSI colors) or an unknown theme, the usage row has no colors.
@@ -136,7 +139,7 @@ not stop the others.
 
 The numbers appear after the next refresh trigger of each provider. Run
 `herdr plugin action invoke herdr-usage.refresh` to publish them immediately.
-The usage row only appears on the pane that carries the tokens. Panes without them
+The usage rows only appear on the pane that carries the tokens. Panes without them
 keep their normal lines.
 
 ### Windows Terminal font
@@ -181,10 +184,8 @@ Dracula theme.
 claude = [
   ["state_icon", "machine", "workspace", "tab"],
   [{ token = "$herdr_usage_icon", fg = "#D97757" }, "agent"],
-  [
-    { token = "$herdr_usage_1", rules = [{ starts_with = "●", fg = "#ff5555" }, { starts_with = "◐", fg = "#f1fa8c" }, { starts_with = "○", fg = "#50fa7b" }] },
-    { token = "$herdr_usage_2", rules = [{ starts_with = "●", fg = "#ff5555" }, { starts_with = "◐", fg = "#f1fa8c" }, { starts_with = "○", fg = "#50fa7b" }] },
-  ],
+  [{ token = "$herdr_usage_1", rules = [{ starts_with = "●", fg = "#ff5555" }, { starts_with = "◐", fg = "#f1fa8c" }, { starts_with = "○", fg = "#50fa7b" }] }],
+  [{ token = "$herdr_usage_2", rules = [{ starts_with = "●", fg = "#ff5555" }, { starts_with = "◐", fg = "#f1fa8c" }, { starts_with = "○", fg = "#50fa7b" }] }],
 ]
 # Same layout for every other provider: codex = [ ... ]
 ```

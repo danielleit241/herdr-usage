@@ -226,7 +226,8 @@ function usageItem(slot, colors) {
 function rowsFor(baseRaw, colors, logoColor) {
   let rows = baseRaw;
   if (logoColor) rows = replaceAgent(rows, `{ token = "$herdr_usage_icon", fg = "${logoColor}" }, "agent"`) ?? rows;
-  const usage = `[${usageItem(1, colors)}, ${usageItem(2, colors)}]`;
+  // One row per window: each carries its reset time, so they do not fit side by side.
+  const usage = `[${usageItem(1, colors)}], [${usageItem(2, colors)}]`;
   const close = rows.lastIndexOf("]");
   const head = rows.slice(0, close).trimEnd();
   const sep = head.endsWith(",") ? " " : head.endsWith("[") ? "" : ", ";

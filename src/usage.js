@@ -16,7 +16,7 @@ function unavailable(provider, reason) {
 
 function windowLabel(minutes) {
   if (minutes === 300) return "5h";
-  if (minutes === 10080) return "wk";
+  if (minutes === 10080) return "Wk";
   if (minutes % 1440 === 0) return `${minutes / 1440}d`;
   if (minutes % 60 === 0) return `${minutes / 60}h`;
   return `${minutes}m`;
@@ -36,15 +36,27 @@ function levelGlyph(usedPercent) {
   return "○";
 }
 
-// One sidebar token per window slot, e.g. "◐ wk 55%", expiring when the window
-// resets. A slot is null when the window is unknown or has already reset.
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_SEC = 86_400;
+
+// Local reset time, "19:15". Within 24 h the time alone is unambiguous; a
+// later reset also names the weekday, "Mon 19:15".
+function resetLabel(resetsAt, nowSec) {
+  const d = new Date(resetsAt * 1000);
+  const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return resetsAt - nowSec > DAY_SEC ? `${WEEKDAYS[d.getDay()]} ${time}` : time;
+}
+
+// One sidebar token per window slot, e.g. "◐ Wk 55% Mon 19:15", expiring when
+// the window resets. A slot is null when the window is unknown or has already reset.
 function windowTokens(state, nowSec, slots = 2) {
   return Array.from({ length: slots }, (_, i) => {
     const w = state.status === "ok" ? state.windows[i] : undefined;
     if (!w || (w.resetsAt !== null && w.resetsAt <= nowSec)) return null;
     const pct = Math.round(w.usedPercent);
     const ttlMs = w.resetsAt === null ? MAX_TTL_MS : Math.min(MAX_TTL_MS, Math.ceil((w.resetsAt - nowSec) * 1000));
-    return { value: `${levelGlyph(pct)} ${w.label} ${pct}%`, ttlMs };
+    const reset = w.resetsAt === null ? "" : ` ${resetLabel(w.resetsAt, nowSec)}`;
+    return { value: `${levelGlyph(pct)} ${w.label} ${pct}%${reset}`, ttlMs };
   });
 }
 

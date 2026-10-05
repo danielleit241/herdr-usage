@@ -66,7 +66,7 @@ Requirements: herdr 0.9.0+ and Node.js 18+ on `PATH`.
 
    This installs the latest release: herdr checks out the repository's default branch,
    which is `release` and only moves when a version is published. Development happens
-   on `main`. To pin a version, add `--ref v0.1.0`. To update, run the same command
+   on `main`. To pin a version, add `--ref v0.2.0`. To update, run the same command
    again.
 
 2. Wire the agent hooks:

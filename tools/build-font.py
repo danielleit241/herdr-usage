@@ -56,9 +56,14 @@ def svg_to_glyph(svg_path):
     # Resolve the even-odd overlaps into clean contours that any rasterizer
     # (non-zero winding) fills the same way.
     shape.simplify(fix_winding=True)
+    # Fit the drawn shape, not the SVG's padded viewBox, into the em square and
+    # center it, so every logo has the same size.
+    x0, y0, x1, y1 = shape.bounds
+    k = UPM / max(x1 - x0, y1 - y0)
+    fit = Transform().translate(UPM / 2, UPM / 2).scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2)
     out = TTGlyphPen(None)
     # TrueType wants quadratic curves and clockwise outer contours.
-    shape.draw(Cu2QuPen(out, max_err=1, reverse_direction=True))
+    shape.draw(TransformPen(Cu2QuPen(out, max_err=1, reverse_direction=True), fit))
     return out.glyph()
 
 

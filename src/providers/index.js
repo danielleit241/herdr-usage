@@ -1,20 +1,32 @@
-// Every usage provider. To add one:
-//   1. write src/providers/<id>.js that returns a UsageState (src/usage.js),
-//   2. add it below; `id` is the agent id that `herdr agent list` reports,
+// Every usage provider. Each src/providers/<id>.js exports one object:
+//
+//   {
+//     id,                // herdr agent id (`herdr agent list` .agent)
+//     configDir(env),    // the tool's config dir; install/uninstall skip the provider when it is missing
+//     read(env),         // -> UsageState (src/usage.js); may throw, readAll isolates it
+//     install(env),      // -> string[] lines "<id>: ...", idempotent
+//     uninstall(env),    // -> string[] lines
+//     hooks: { "<cli subcommand>": (input, ctx) => void },  // commands the tool runs
+//     ...data helpers used by tests
+//   }
+//
+// A hook gets the stdin text and ctx = { env, now, write(text), publish({ throttle }) }.
+// `write` prints to stdout at once; `publish()` pushes usage to herdr (only inside
+// herdr), and `publish({ throttle: true })` skips it when nothing changed recently.
+//
+// To add a provider:
+//   1. write src/providers/<id>.js with that contract,
+//   2. list it in PROVIDERS below,
 //   3. optional logo: add assets/<id>.svg and an entry in assets/icons.json,
 //      then rebuild the font (uv run tools/build-font.py).
-// Each tool still needs its own refresh trigger (src/install.js), because every
-// agent exposes a different hook.
+// Each tool needs its own refresh trigger (its `install` and `hooks`), because
+// every agent exposes a different hook.
 
-const paths = require("../paths");
 const { unavailable } = require("../usage");
 const claude = require("./claude");
 const codex = require("./codex");
 
-const PROVIDERS = [
-  { id: "claude", read: (env) => claude.read(paths.claudeCachePath(env)) },
-  { id: "codex", read: (env) => codex.read(paths.codexHome(env)) },
-];
+const PROVIDERS = [claude, codex];
 
 // One provider failing never hides the others.
 function readAll(env = process.env) {
@@ -27,4 +39,9 @@ function readAll(env = process.env) {
   });
 }
 
-module.exports = { PROVIDERS, readAll };
+// Hook handlers of all providers, by CLI subcommand name.
+function hookHandlers() {
+  return Object.assign({}, ...PROVIDERS.map((p) => p.hooks));
+}
+
+module.exports = { PROVIDERS, readAll, hookHandlers };

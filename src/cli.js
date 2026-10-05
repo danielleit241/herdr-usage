@@ -3,25 +3,22 @@
 //
 //   status             print the normalized usage state of every provider (JSON)
 //   publish            push usage to herdr agent panes
-//   claude-statusline  Claude Code statusLine command: cache rate_limits, then publish (throttled)
-//   codex-hook         Codex Stop hook: publish
-//   install            wire the Claude statusLine and the Codex Stop hook
+//   install            wire every provider's tool to refresh usage
 //   uninstall          undo `install`
 //   install-font       install the logo font for the current user
 //   uninstall-font     undo `install-font`
+//   <hook>             commands the tools run, listed by each provider (src/providers)
 //
-// Hook commands never fail the calling agent: they always exit 0. The statusLine
-// prints only the output of a statusLine it chained at install time.
+// Hook commands never fail the calling agent: they always exit 0.
 
-const { execSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const paths = require("./paths");
-const claude = require("./providers/claude");
 const providers = require("./providers");
 const herdr = require("./herdr");
 const installer = require("./install");
 const font = require("./font");
+const { readJson } = require("./config-files");
 const { windowTokens } = require("./usage");
 
 const STATUSLINE_PUBLISH_INTERVAL_MS = 15_000;
@@ -55,7 +52,7 @@ function lastPublishPath() {
 // otherwise at most once per interval (that also moves the usage row when the
 // owner pane changes).
 function publishDue(sig, now) {
-  const last = installer.readJson(lastPublishPath(), null);
+  const last = readJson(lastPublishPath(), null);
   return !last || last.signature !== sig || now - last.at >= STATUSLINE_PUBLISH_INTERVAL_MS;
 }
 
@@ -70,36 +67,36 @@ function publishAndRecord(states, now) {
   }
 }
 
-// The shell Claude Code runs statusLine commands with: `sh -c` on macOS and
-// Linux; Git Bash on Windows, or PowerShell when Git Bash is missing.
-function statusLineShell(env = process.env, platform = process.platform) {
-  if (platform !== "win32") return "/bin/sh";
-  for (const candidate of [env.CLAUDE_CODE_GIT_BASH_PATH, env.SHELL]) {
-    if (candidate && /bash(\.exe)?$/i.test(candidate) && fs.existsSync(candidate)) return candidate;
-  }
-  return "powershell.exe";
+// What a provider hook can do. publish does nothing outside herdr.
+function hookContext(env, now) {
+  return {
+    env,
+    now,
+    write: (text) => process.stdout.write(text),
+    publish({ throttle = false } = {}) {
+      if (!inHerdr(env)) return;
+      const states = readStates(env);
+      if (throttle && !publishDue(signature(states, Math.floor(now / 1000)), now)) return;
+      publishAndRecord(states, now);
+    },
+  };
 }
 
-// Run the user's previous statusLine, if `install` chained one, and return its output.
-function chainedStatusLine(input) {
-  const chained = installer.readJson(installer.chainPath(), null);
-  if (!chained || !chained.command) return "";
+function runHook(handler, env = process.env) {
+  const input = readStdin();
   try {
-    return execSync(chained.command, {
-      input,
-      encoding: "utf8",
-      shell: statusLineShell(),
-      timeout: 10_000,
-      windowsHide: true,
-      stdio: ["pipe", "pipe", "inherit"],
-    });
-  } catch (err) {
-    // A script may print its line and still exit non-zero.
-    return typeof err.stdout === "string" ? err.stdout : "";
+    handler(input, hookContext(env, Date.now()));
+  } catch {
+    // degrade silently: a hook must not break the calling agent
   }
 }
 
 function main(command) {
+  const hooks = providers.hookHandlers();
+  if (Object.hasOwn(hooks, command)) {
+    runHook(hooks[command]);
+    return;
+  }
   switch (command) {
     case "status":
       process.stdout.write(`${JSON.stringify(readStates(), null, 2)}\n`);
@@ -111,30 +108,6 @@ function main(command) {
       if (failed.length) process.exitCode = 1;
       return;
     }
-    case "claude-statusline": {
-      const input = readStdin();
-      // Print first: Claude Code cancels a statusLine that is still running.
-      process.stdout.write(chainedStatusLine(input));
-      try {
-        const now = Date.now();
-        claude.cacheFromStatusLine(JSON.parse(input), paths.claudeCachePath(), Math.floor(now / 1000));
-        if (inHerdr()) {
-          const states = readStates();
-          if (publishDue(signature(states, Math.floor(now / 1000)), now)) publishAndRecord(states, now);
-        }
-      } catch {
-        // degrade silently: the statusLine must keep working
-      }
-      return;
-    }
-    case "codex-hook":
-      readStdin();
-      try {
-        if (inHerdr()) publishAndRecord(readStates(), Date.now());
-      } catch {
-        // degrade silently: the hook must not block Codex
-      }
-      return;
     case "install":
     case "uninstall":
       for (const line of installer[command]()) process.stdout.write(`${line}\n`);
@@ -146,11 +119,11 @@ function main(command) {
       for (const line of font.uninstallFont()) process.stdout.write(`${line}\n`);
       return;
     default:
-      process.stderr.write("usage: herdr-usage <status|publish|install|uninstall|install-font|uninstall-font|claude-statusline|codex-hook>\n");
+      process.stderr.write(`usage: herdr-usage <status|publish|install|uninstall|install-font|uninstall-font|${Object.keys(hooks).join("|")}>\n`);
       process.exitCode = 2;
   }
 }
 
 if (require.main === module) main(process.argv[2]);
 
-module.exports = { readStates, statusLineShell, signature, publishDue, chainedStatusLine };
+module.exports = { readStates, signature, publishDue, publishAndRecord };

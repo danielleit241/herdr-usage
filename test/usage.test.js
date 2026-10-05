@@ -54,7 +54,7 @@ test("claude: statusLine payload round-trips through the cache", () => {
     },
   };
   assert.equal(claude.cacheFromStatusLine(payload, cache, NOW), true);
-  assert.deepEqual(claude.read(cache), ok("claude", [
+  assert.deepEqual(claude.readCache(cache), ok("claude", [
     { label: "5h", usedPercent: 12.5, resetsAt: NOW + 3600 },
     { label: "wk", usedPercent: 40, resetsAt: NOW + 86400 },
   ]));
@@ -64,14 +64,14 @@ test("claude: payload without rate_limits keeps the previous cache", () => {
   const cache = path.join(tmp(), "claude.json");
   claude.cacheFromStatusLine({ rate_limits: { seven_day: { used_percentage: 7, resets_at: NOW + 9 } } }, cache, NOW);
   assert.equal(claude.cacheFromStatusLine({ model: {} }, cache, NOW + 5), false);
-  assert.equal(claude.read(cache).windows[0].usedPercent, 7);
+  assert.equal(claude.readCache(cache).windows[0].usedPercent, 7);
 });
 
 test("claude: missing or corrupt cache degrades to unavailable", () => {
   const dir = tmp();
-  assert.equal(claude.read(path.join(dir, "none.json")).status, "unavailable");
+  assert.equal(claude.readCache(path.join(dir, "none.json")).status, "unavailable");
   fs.writeFileSync(path.join(dir, "bad.json"), "{");
-  assert.equal(claude.read(path.join(dir, "bad.json")).status, "unavailable");
+  assert.equal(claude.readCache(path.join(dir, "bad.json")).status, "unavailable");
 });
 
 function writeRollout(home, day, name, lines, mtimeSec) {
@@ -100,7 +100,7 @@ test("codex: newest rollout's last rate_limits wins", () => {
   const home = tmp();
   writeRollout(home, "04", "rollout-a.jsonl", [tokenCount(90, 90)], NOW - 1000);
   writeRollout(home, "05", "rollout-b.jsonl", [tokenCount(10, 20), "{truncated", tokenCount(34, 55)], NOW);
-  const state = codex.read(home);
+  const state = codex.readSessions(home);
   assert.equal(state.status, "ok");
   assert.deepEqual(values(state), ["○ 5h 34%", "◐ wk 55%"]);
   assert.equal(state.observedAt, Math.floor(Date.parse("2026-10-05T10:00:00.000Z") / 1000));
@@ -110,7 +110,7 @@ test("codex: falls back to an older rollout when the newest has no rate_limits",
   const home = tmp();
   writeRollout(home, "05", "rollout-a.jsonl", [tokenCount(1, 2)], NOW - 50);
   writeRollout(home, "05", "rollout-b.jsonl", [{ type: "session_meta", payload: {} }], NOW);
-  assert.deepEqual(values(codex.read(home)), ["○ 5h 1%", "○ wk 2%"]);
+  assert.deepEqual(values(codex.readSessions(home)), ["○ 5h 1%", "○ wk 2%"]);
 });
 
 test("codex: ignores rate limit buckets other than the main one", () => {
@@ -118,14 +118,14 @@ test("codex: ignores rate limit buckets other than the main one", () => {
   const premium = tokenCount(99, 99);
   premium.payload.rate_limits.limit_id = "premium";
   writeRollout(home, "05", "rollout-a.jsonl", [tokenCount(34, 55), premium], NOW);
-  assert.deepEqual(values(codex.read(home)), ["○ 5h 34%", "◐ wk 55%"]);
+  assert.deepEqual(values(codex.readSessions(home)), ["○ 5h 34%", "◐ wk 55%"]);
 });
 
 test("codex: considers a session from the previous day directory", () => {
   const home = tmp();
   for (let i = 0; i < 6; i++) writeRollout(home, "05", `rollout-new-${i}.jsonl`, [{ type: "x" }], NOW - 100);
   writeRollout(home, "04", "rollout-old.jsonl", [tokenCount(1, 2)], NOW);
-  assert.deepEqual(values(codex.read(home)), ["○ 5h 1%", "○ wk 2%"]);
+  assert.deepEqual(values(codex.readSessions(home)), ["○ 5h 1%", "○ wk 2%"]);
 });
 
 test("claude: an idle pane's older reading never replaces a newer one", () => {
@@ -133,11 +133,11 @@ test("claude: an idle pane's older reading never replaces a newer one", () => {
   const send = (five) => claude.cacheFromStatusLine({ rate_limits: { five_hour: five } }, cache, NOW);
   send({ used_percentage: 70, resets_at: NOW + 3600 });
   send({ used_percentage: 20, resets_at: NOW + 3605 }); // same window, stale pane
-  assert.equal(claude.read(cache).windows[0].usedPercent, 70);
+  assert.equal(claude.readCache(cache).windows[0].usedPercent, 70);
   send({ used_percentage: 5, resets_at: NOW + 3600 - 18000 }); // previous window
-  assert.equal(claude.read(cache).windows[0].usedPercent, 70);
+  assert.equal(claude.readCache(cache).windows[0].usedPercent, 70);
   send({ used_percentage: 3, resets_at: NOW + 3600 + 18000 }); // next window
-  assert.equal(claude.read(cache).windows[0].usedPercent, 3);
+  assert.equal(claude.readCache(cache).windows[0].usedPercent, 3);
 });
 
 test("claude: a payload missing one window keeps the cached one", () => {
@@ -147,11 +147,11 @@ test("claude: a payload missing one window keeps the cached one", () => {
     seven_day: { used_percentage: 30, resets_at: NOW + 600 },
   } }, cache, NOW);
   claude.cacheFromStatusLine({ rate_limits: { seven_day: { used_percentage: 31, resets_at: NOW + 600 } } }, cache, NOW);
-  assert.deepEqual(claude.read(cache).windows.map((w) => w.usedPercent), [10, 31]);
+  assert.deepEqual(claude.readCache(cache).windows.map((w) => w.usedPercent), [10, 31]);
 });
 
 test("codex: missing sessions dir degrades to unavailable", () => {
-  assert.equal(codex.read(path.join(tmp(), "nope")).status, "unavailable");
+  assert.equal(codex.readSessions(path.join(tmp(), "nope")).status, "unavailable");
 });
 
 test("planReports shows each provider once and clears the other panes", () => {
@@ -211,7 +211,7 @@ test("reportCommands sets each token with its own TTL, then clears", () => {
 });
 
 test("statusLineShell matches Claude Code: sh on Unix, Git Bash or PowerShell on Windows", () => {
-  const { statusLineShell } = require("../src/cli");
+  const { statusLineShell } = require("../src/providers/claude");
   assert.equal(statusLineShell({ SHELL: process.execPath }, "linux"), "/bin/sh");
   assert.equal(statusLineShell({ SHELL: "/usr/bin/fish" }, "darwin"), "/bin/sh");
   const bash = path.join(tmp(), "bash.exe");
@@ -235,7 +235,7 @@ function withStateDir(fn) {
 }
 
 test("chainedStatusLine keeps the output of a script that exits non-zero", () => {
-  const { chainedStatusLine } = require("../src/cli");
+  const { chainedStatusLine } = require("../src/providers/claude");
   withStateDir((dir) => {
     fs.writeFileSync(path.join(dir, "claude-statusline-chain.json"), JSON.stringify({ command: "echo line; exit 1" }));
     assert.equal(chainedStatusLine("{}").trim(), "line");
@@ -251,4 +251,19 @@ test("publishDue publishes on change, otherwise once per interval", () => {
     assert.equal(publishDue("b", 2000), true);
     assert.equal(publishDue("a", 16_000), true);
   });
+});
+
+test("every provider satisfies the provider contract", () => {
+  const { PROVIDERS } = require("../src/providers");
+  const names = [];
+  for (const p of PROVIDERS) {
+    assert.equal(typeof p.id, "string");
+    for (const fn of ["configDir", "read", "install", "uninstall"]) assert.equal(typeof p[fn], "function", `${p.id}.${fn}`);
+    assert.equal(typeof p.hooks, "object");
+    for (const [name, handler] of Object.entries(p.hooks)) {
+      assert.equal(typeof handler, "function", `${p.id} hook ${name}`);
+      names.push(name);
+    }
+  }
+  assert.equal(new Set(names).size, names.length);
 });

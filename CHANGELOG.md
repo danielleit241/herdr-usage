@@ -12,6 +12,9 @@
   and broadcasts the font change, like Explorer "Install". It removes the 0.2.0 `.otf`.
 - README: Windows Terminal needs `HerdrUsageIcons` in its font list, otherwise it
   shows `?`.
+- Internal: one provider contract (`src/providers/`) for reading usage, install and
+  hook commands; logos listed in `assets/icons.json`. A new agent provider is one new
+  module. Installed hook commands are unchanged.
 
 ## 0.2.0 - 2026-10-05
 

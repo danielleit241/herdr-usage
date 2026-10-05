@@ -7,6 +7,8 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const paths = require("../paths");
+const { command, isOurs, readJson, editJson } = require("../config-files");
 const { unavailable, windowLabel, toWindow } = require("../usage");
 
 const TAIL_BYTES = 512 * 1024;
@@ -95,7 +97,7 @@ function normalize(found) {
   return { provider: "codex", status: "ok", windows, observedAt: found.observedAt };
 }
 
-function read(codexHomeDir) {
+function readSessions(codexHomeDir) {
   try {
     for (const file of recentRollouts(path.join(codexHomeDir, "sessions")).slice(0, MAX_READS)) {
       const found = lastRateLimits(readTail(file));
@@ -107,4 +109,73 @@ function read(codexHomeDir) {
   }
 }
 
-module.exports = { recentRollouts, lastRateLimits, normalize, read };
+// --- install -------------------------------------------------------------
+
+function hooksPath(env = process.env) {
+  return path.join(paths.codexHome(env), "hooks.json");
+}
+
+function stopGroups(config, file) {
+  const stop = config.hooks?.Stop ?? [];
+  if (!Array.isArray(stop)) throw new Error(`cannot parse ${file}: hooks.Stop is not an array`);
+  return stop;
+}
+
+// Stop groups without any herdr-usage hook (from this or another plugin directory).
+function withoutOurs(stop) {
+  const ours = (h) => isOurs(h && h.command, "codex-hook");
+  const hasOurs = (group) => Array.isArray(group.hooks) && group.hooks.some(ours);
+  return stop
+    .filter((group) => !(hasOurs(group) && group.hooks.every(ours)))
+    .map((group) => (hasOurs(group) ? { ...group, hooks: group.hooks.filter((h) => !ours(h)) } : group));
+}
+
+// Codex runs hooks.json only with `[features] hooks = true` in config.toml.
+function codexHooksNote(env) {
+  let toml = "";
+  try {
+    toml = fs.readFileSync(path.join(paths.codexHome(env), "config.toml"), "utf8");
+  } catch {
+    // no config.toml
+  }
+  return /^\[features\][^[]*^\s*hooks\s*=\s*true/m.test(toml)
+    ? null
+    : "codex: note: enable hooks with `[features] hooks = true` in config.toml";
+}
+
+function install(env = process.env) {
+  const file = hooksPath(env);
+  const config = readJson(file, {});
+  const stop = stopGroups(config, file);
+  const next = [...withoutOurs(stop), { hooks: [{ type: "command", command: command("codex-hook"), timeout: 10 }] }];
+  const note = codexHooksNote(env);
+  const notes = note ? [note] : [];
+  if (JSON.stringify(next) === JSON.stringify(stop)) return [`codex: already installed (${file})`, ...notes];
+  editJson(file, { ...config, hooks: { ...(config.hooks || {}), Stop: next } });
+  return [`codex: Stop hook installed (${file})`, ...notes];
+}
+
+function uninstall(env = process.env) {
+  const file = hooksPath(env);
+  const config = readJson(file, {});
+  const stop = stopGroups(config, file);
+  const kept = withoutOurs(stop);
+  if (JSON.stringify(kept) === JSON.stringify(stop)) return ["codex: not installed"];
+  const hooks = { ...config.hooks, Stop: kept };
+  if (kept.length === 0) delete hooks.Stop;
+  editJson(file, { ...config, hooks });
+  return [`codex: Stop hook removed (${file})`];
+}
+
+module.exports = {
+  id: "codex",
+  configDir: (env = process.env) => paths.codexHome(env),
+  read: (env) => readSessions(paths.codexHome(env)),
+  install,
+  uninstall,
+  hooks: { "codex-hook": (input, ctx) => ctx.publish() },
+  recentRollouts,
+  lastRateLimits,
+  normalize,
+  readSessions,
+};

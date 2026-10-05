@@ -4,7 +4,8 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { install, uninstall, chainPath } = require("../src/install");
+const { install, uninstall } = require("../src/install");
+const { chainPath } = require("../src/providers/claude");
 
 function sandbox({ claude, codex } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "herdr-usage-install-"));

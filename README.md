@@ -220,6 +220,20 @@ herdr plugin action invoke herdr-usage.install-hooks
 `fonts/HerdrUsageIcons.ttf` is built from `assets/*.svg` and committed, so users need
 no build step. After changing a logo, rebuild it with `uv run tools/build-font.py`.
 
+### Adding a provider
+
+Every provider follows one contract, documented in `src/providers/index.js`:
+
+1. Write `src/providers/<id>.js`, where `<id>` is the herdr agent id. It exports
+   `id`, `configDir`, `read` (returns a usage state), `install`, `uninstall`, and
+   `hooks` (the CLI commands that the tool runs to refresh usage).
+2. Add it to `PROVIDERS` in `src/providers/index.js`.
+3. Optional logo: add `assets/<id>.svg` and an entry in `assets/icons.json`, then
+   rebuild the font. Never change an existing codepoint.
+
+`install`, `uninstall`, `status`, `publish` and the hook commands pick up the new
+provider without other changes.
+
 ## License
 
 MIT. `tools/build-font.py` is adapted from

@@ -75,8 +75,14 @@ function setup(env = process.env, { build = false, platform = process.platform, 
     writeLog(env, skipped);
     return skipped;
   }
-  if (!build) fs.rmSync(disabledPath(env), { force: true });
   const lines = [];
+  if (!build) {
+    // Re-enables updates. Isolated: on Linux a broken config dir throws ENOTDIR here.
+    step(lines, "setup", () => {
+      fs.rmSync(disabledPath(env), { force: true });
+      return [];
+    });
+  }
   step(lines, "font", () => font.installFont(env, platform, exec));
   const launcherStep = step(lines, "launcher", () => launcher.writeHook(env, { build }));
   if (launcherStep.ok) step(lines, "hooks", () => installer.install(env));

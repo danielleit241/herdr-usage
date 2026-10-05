@@ -3,18 +3,22 @@
 // panes of that provider have the tokens cleared, so sessions do not repeat it.
 
 const { execFileSync } = require("node:child_process");
+const iconList = require("../assets/icons.json");
 const { windowTokens } = require("./usage");
 const { PLUGIN_ID } = require("./paths");
 
-// One token per window slot (Claude five_hour/seven_day, Codex primary/secondary),
+// One token per window slot (e.g. Claude five_hour/seven_day),
 // plus the provider logo. Pane tokens share one map per pane, so the names carry
 // the plugin prefix.
 const WINDOW_TOKENS = ["herdr_usage_1", "herdr_usage_2"];
 const ICON_TOKEN = "herdr_usage_icon";
 const TOKENS = [...WINDOW_TOKENS, ICON_TOKEN];
 
-// Private Use codepoints drawn by fonts/HerdrUsageIcons.ttf (see tools/build-font.py).
-const ICONS = { claude: "\u{10FFE1}", codex: "\u{10FFE2}" };
+// provider id -> Private Use character drawn by fonts/HerdrUsageIcons.ttf.
+// assets/icons.json is shared with tools/build-font.py.
+const ICONS = Object.fromEntries(
+  Object.entries(iconList).map(([id, icon]) => [id, String.fromCodePoint(parseInt(icon.codepoint, 16))]),
+);
 
 // Wanted value per TOKENS slot, or null. The logo lives as long as the
 // longest-lived window, so it never shows without numbers next to it.

@@ -1,7 +1,7 @@
 // Provider-neutral usage state shared by every adapter.
 //
 // UsageState = {
-//   provider: "claude" | "codex",
+//   provider: string,             // herdr agent id, see src/providers/index.js
 //   status: "ok" | "unavailable",
 //   windows: [{ label: "5h" | "wk" | ..., usedPercent: number, resetsAt: epochSeconds | null }],
 //   observedAt: epochSeconds | null,

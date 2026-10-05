@@ -18,7 +18,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const paths = require("./paths");
 const claude = require("./providers/claude");
-const codex = require("./providers/codex");
+const providers = require("./providers");
 const herdr = require("./herdr");
 const installer = require("./install");
 const font = require("./font");
@@ -27,7 +27,7 @@ const { windowTokens } = require("./usage");
 const STATUSLINE_PUBLISH_INTERVAL_MS = 15_000;
 
 function readStates(env = process.env) {
-  return [claude.read(paths.claudeCachePath(env)), codex.read(paths.codexHome(env))];
+  return providers.readAll(env);
 }
 
 function readStdin() {

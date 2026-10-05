@@ -12,6 +12,7 @@ adihex/herdr-agent-icons (MIT).
 
 Run:  uv run tools/build-font.py
 """
+import json
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -29,11 +30,12 @@ UPM = 1000
 LOGO_SIZE = UPM * 18 / 24
 FAMILY = "HerdrUsageIcons"
 WHITE = {"#fff", "#ffffff", "white"}
-# glyph name -> (source SVG, codepoint). Keep in sync with ICONS in src/herdr.js.
-# Top of plane 16, away from other icon fonts that count up from U+100000.
+# provider id -> {svg, codepoint}; src/herdr.js reads the same file. Codepoints
+# sit at the top of plane 16, away from icon fonts that count up from U+100000.
+# Never renumber one: installed fonts and published tokens would disagree.
 GLYPHS = {
-    "claude": ("claude-color.svg", 0x10FFE1),
-    "codex": ("codex-color.svg", 0x10FFE2),
+    name: (icon["svg"], int(icon["codepoint"], 16))
+    for name, icon in json.loads((ROOT / "assets" / "icons.json").read_text(encoding="utf8")).items()
 }
 
 
@@ -41,7 +43,7 @@ def svg_to_glyph(svg_path):
     root = ET.parse(svg_path).getroot()
     vx, vy, vw, vh = map(float, re.findall(r"-?\d*\.?\d+", root.attrib["viewBox"]))
     s = UPM / max(vw, vh)
-    # A white path is a separate background (the Codex app tile): leave it out.
+    # A white path is a separate background (like the Codex app tile): leave it out.
     paths = [
         el.attrib["d"]
         for el in root.iter()
@@ -58,8 +60,8 @@ def svg_to_glyph(svg_path):
     # (non-zero winding) fills the same way.
     shape.simplify(fix_winding=True)
     # Fit the drawn shape, not the SVG's viewBox, into the same centered box,
-    # so every logo has the same size and position. The box keeps the Codex
-    # logo's own padding: 3 of 24 units on each side.
+    # so every logo has the same size and position. The box keeps the padding of
+    # the 24-unit icon sets (3 units on each side).
     x0, y0, x1, y1 = shape.bounds
     k = LOGO_SIZE / max(x1 - x0, y1 - y0)
     fit = Transform().translate(UPM / 2, UPM / 2).scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2)
@@ -96,6 +98,10 @@ def main():
     fb.setupPost()
     out = ROOT / "fonts" / f"{FAMILY}.ttf"
     out.parent.mkdir(exist_ok=True)
+    # Fixed timestamps: the same sources give the same bytes, so the hashed file
+    # name that install-font uses only changes when a logo changes.
+    fb.font["head"].created = fb.font["head"].modified = 0
+    fb.font.recalcTimestamp = False
     fb.save(out)
     print(f"wrote {out.relative_to(ROOT)}")
 

@@ -69,11 +69,14 @@ function winFontResource(exec, op, file) {
   });
 }
 
+// Returns whether fn succeeded.
 function tryExec(fn) {
   try {
     fn();
+    return true;
   } catch {
     // best effort: the step is optional or the thing is already gone
+    return false;
   }
 }
 
@@ -98,11 +101,15 @@ function installFont(env = process.env, platform = process.platform, exec = run)
   const lines = [];
   for (const old of ownedFiles(dir)) if (old !== name) removeFile(path.join(dir, old), platform, exec, lines);
   fs.mkdirSync(dir, { recursive: true });
-  if (!fs.existsSync(target)) fs.copyFileSync(SOURCE, target);
+  const copied = !fs.existsSync(target);
+  if (copied) fs.copyFileSync(SOURCE, target);
   if (platform === "win32") {
     tryExec(() => exec("reg", ["delete", WIN_FONTS_KEY, "/v", OLD_WIN_FONT_NAME, "/f"]));
     exec("reg", ["add", WIN_FONTS_KEY, "/v", WIN_FONT_NAME, "/t", "REG_SZ", "/d", target, "/f"]);
-    tryExec(() => winFontResource(exec, "add", target));
+    // Load it only once: Windows counts each load, and uninstall unloads once.
+    if (copied && !tryExec(() => winFontResource(exec, "add", target))) {
+      lines.push("font: could not load the font into this session; sign out and back in");
+    }
   } else if (platform !== "darwin") {
     // fontconfig is optional; most terminals rescan the directory on start
     tryExec(() => exec("fc-cache", ["-f", dir]));

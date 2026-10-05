@@ -22,6 +22,7 @@ const { readJson } = require("./config-files");
 const { windowTokens } = require("./usage");
 
 const STATUSLINE_PUBLISH_INTERVAL_MS = 15_000;
+const COMMANDS = ["status", "publish", "install", "uninstall", "install-font", "uninstall-font"];
 
 function readStates(env = process.env) {
   return providers.readAll(env);
@@ -67,14 +68,16 @@ function publishAndRecord(states, now) {
   }
 }
 
-// What a provider hook can do. publish does nothing outside herdr.
-function hookContext(env, now) {
+// What a provider hook can do. publish does nothing outside herdr. `now` is a
+// function: a chained statusLine may run for seconds before the hook caches.
+function hookContext(env) {
   return {
     env,
-    now,
+    now: () => Date.now(),
     write: (text) => process.stdout.write(text),
     publish({ throttle = false } = {}) {
       if (!inHerdr(env)) return;
+      const now = Date.now();
       const states = readStates(env);
       if (throttle && !publishDue(signature(states, Math.floor(now / 1000)), now)) return;
       publishAndRecord(states, now);
@@ -85,7 +88,7 @@ function hookContext(env, now) {
 function runHook(handler, env = process.env) {
   const input = readStdin();
   try {
-    handler(input, hookContext(env, Date.now()));
+    handler(input, hookContext(env));
   } catch {
     // degrade silently: a hook must not break the calling agent
   }
@@ -119,11 +122,11 @@ function main(command) {
       for (const line of font.uninstallFont()) process.stdout.write(`${line}\n`);
       return;
     default:
-      process.stderr.write(`usage: herdr-usage <status|publish|install|uninstall|install-font|uninstall-font|${Object.keys(hooks).join("|")}>\n`);
+      process.stderr.write(`usage: herdr-usage <${[...COMMANDS, ...Object.keys(hooks)].join("|")}>\n`);
       process.exitCode = 2;
   }
 }
 
 if (require.main === module) main(process.argv[2]);
 
-module.exports = { readStates, signature, publishDue, publishAndRecord };
+module.exports = { COMMANDS, readStates, signature, publishDue, publishAndRecord };

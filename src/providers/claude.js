@@ -152,7 +152,7 @@ function chainedStatusLine(input, env = process.env) {
 function statusLineHook(input, { env, now, write, publish }) {
   // Print first: Claude Code cancels a statusLine that is still running.
   write(chainedStatusLine(input, env));
-  cacheFromStatusLine(JSON.parse(input), paths.claudeCachePath(env), Math.floor(now / 1000));
+  cacheFromStatusLine(JSON.parse(input), paths.claudeCachePath(env), Math.floor(now() / 1000));
   publish({ throttle: true });
 }
 

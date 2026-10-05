@@ -266,4 +266,19 @@ test("every provider satisfies the provider contract", () => {
     }
   }
   assert.equal(new Set(names).size, names.length);
+  const { COMMANDS } = require("../src/cli");
+  for (const name of names) assert.ok(!COMMANDS.includes(name), `hook ${name} hides a built-in command`);
+});
+
+test("hook commands always exit 0 and print the chained statusLine first", () => {
+  const { execFileSync, spawnSync } = require("node:child_process");
+  const cli = path.join(__dirname, "..", "src", "cli.js");
+  const state = fs.mkdtempSync(path.join(os.tmpdir(), "herdr-usage-cli-"));
+  const env = { ...process.env, HERDR_ENV: "", HERDR_PLUGIN_STATE_DIR: state };
+  fs.writeFileSync(claude.chainPath(env), JSON.stringify({ command: "echo chained" }));
+  // Bad stdin: the hook fails after printing and still exits 0.
+  const out = execFileSync(process.execPath, [cli, "claude-statusline"], { input: "not json", env, encoding: "utf8" });
+  assert.equal(out.trim(), "chained");
+  execFileSync(process.execPath, [cli, "codex-hook"], { input: "{}", env });
+  assert.equal(spawnSync(process.execPath, [cli, "bogus"], { env }).status, 2);
 });

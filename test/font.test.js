@@ -49,6 +49,10 @@ test("installFont on Windows replaces older installs and registers the new file"
   const add = calls.findIndex((c) => c.file === "reg" && c.args[0] === "add");
   assert.ok(calls[add].args.includes(WIN_FONT_NAME) && calls[add].args.includes(target));
   assert.deepEqual(calls[add + 1].extra, { HERDR_USAGE_FONT_OP: "add", HERDR_USAGE_FONT: target });
+  // A second install does not load the font again: uninstall unloads it once.
+  calls.length = 0;
+  installFont(env, "win32", exec);
+  assert.ok(!calls.some((c) => c.extra && c.extra.HERDR_USAGE_FONT_OP === "add"));
   calls.length = 0;
   uninstallFont(env, "win32", exec);
   assert.ok(calls.some((c) => c.file === "reg" && c.args[0] === "delete" && c.args.includes(WIN_FONT_NAME)));

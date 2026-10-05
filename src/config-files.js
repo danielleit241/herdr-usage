@@ -19,7 +19,7 @@ function readJson(file, fallback) {
   }
   try {
     // Windows editors often save a UTF-8 BOM.
-    return JSON.parse(text.replace(/^﻿/, ""));
+    return JSON.parse(text.replace(/^\uFEFF/, ""));
   } catch (err) {
     throw new Error(`cannot parse ${file}: ${err.message}`);
   }

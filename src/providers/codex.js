@@ -143,16 +143,25 @@ function codexHooksNote(env) {
     : "codex: note: enable hooks with `[features] hooks = true` in config.toml";
 }
 
-function install(env = process.env) {
-  const file = hooksPath(env);
+function installHook(file) {
   const config = readJson(file, {});
   const stop = stopGroups(config, file);
   const next = [...withoutOurs(stop), { hooks: [{ type: "command", command: command("codex-hook"), timeout: 10 }] }];
-  const note = codexHooksNote(env);
-  const notes = note ? [note] : [];
-  if (JSON.stringify(next) === JSON.stringify(stop)) return [`codex: already installed (${file})`, ...notes];
+  if (JSON.stringify(next) === JSON.stringify(stop)) return `codex: already installed (${file})`;
   editJson(file, { ...config, hooks: { ...(config.hooks || {}), Stop: next } });
-  return [`codex: Stop hook installed (${file})`, ...notes];
+  return `codex: Stop hook installed (${file})`;
+}
+
+// The note also follows an error: a broken hooks.json and disabled hooks often come together.
+function install(env = process.env) {
+  const note = codexHooksNote(env);
+  let line;
+  try {
+    line = installHook(hooksPath(env));
+  } catch (err) {
+    line = `codex: error: ${err.message}`;
+  }
+  return note ? [line, note] : [line];
 }
 
 function uninstall(env = process.env) {

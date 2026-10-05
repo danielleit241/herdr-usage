@@ -3,7 +3,8 @@
 ## 0.2.1 - 2026-10-05
 
 - Logos: Claude starburst (`assets/claude-color.svg`) and the Codex cloud without its
-  white tile (`assets/codex-color.svg`), scaled to the same size.
+  white tile (`assets/codex-color.svg`), both in the same centered box.
+- README: no logo images.
 - Font is installed under a content-hashed file name, so an update never fails on a
   file the terminal keeps locked.
 - README: put `$herdr_usage_icon` in front of `agent`, so the usage row is not cut off.

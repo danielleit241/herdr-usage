@@ -1,11 +1,5 @@
 # herdr-usage
 
-<p>
-  <img src="assets/claude-color.svg" alt="Claude Code" height="32">
-  &nbsp;
-  <img src="assets/codex-color.svg" alt="Codex" height="32">
-</p>
-
 A [herdr](https://github.com/herdrdev/herdr) plugin that shows your **Claude Code** and
 **Codex** subscription usage (5-hour and weekly windows) in the agents sidebar, once per
 provider, colored by level:

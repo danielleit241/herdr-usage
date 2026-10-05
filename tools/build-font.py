@@ -26,6 +26,7 @@ from fontTools.svgLib.path import parse_path
 
 ROOT = Path(__file__).resolve().parent.parent
 UPM = 1000
+LOGO_SIZE = UPM * 18 / 24
 FAMILY = "HerdrUsageIcons"
 WHITE = {"#fff", "#ffffff", "white"}
 # glyph name -> (source SVG, codepoint). Keep in sync with ICONS in src/herdr.js.
@@ -56,10 +57,11 @@ def svg_to_glyph(svg_path):
     # Resolve the even-odd overlaps into clean contours that any rasterizer
     # (non-zero winding) fills the same way.
     shape.simplify(fix_winding=True)
-    # Fit the drawn shape, not the SVG's padded viewBox, into the em square and
-    # center it, so every logo has the same size.
+    # Fit the drawn shape, not the SVG's viewBox, into the same centered box,
+    # so every logo has the same size and position. The box keeps the Codex
+    # logo's own padding: 3 of 24 units on each side.
     x0, y0, x1, y1 = shape.bounds
-    k = UPM / max(x1 - x0, y1 - y0)
+    k = LOGO_SIZE / max(x1 - x0, y1 - y0)
     fit = Transform().translate(UPM / 2, UPM / 2).scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2)
     out = TTGlyphPen(None)
     # TrueType wants quadratic curves and clockwise outer contours.

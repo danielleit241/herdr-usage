@@ -1,0 +1,48 @@
+# herdr-usage: shows Claude Code and Codex subscription usage (5h / weekly %)
+# in the herdr agents sidebar through the `$usage` pane token.
+#
+# The agents drive refresh themselves (Claude statusLine, Codex Stop hook,
+# wired by the `install-hooks` action). Herdr hooks add an immediate refresh
+# when an agent appears, on linux/macos only: on Windows 11 every console
+# process started from a herdr hook flashes a Windows Terminal window.
+
+id = "herdr-usage"
+name = "herdr-usage"
+version = "0.1.0"
+description = "Claude Code + Codex usage (5h / weekly) in the agents sidebar."
+min_herdr_version = "0.9.0"
+platforms = ["linux", "macos", "windows"]
+
+# No dependencies to install: only fail early when Node.js is missing or too old.
+[[build]]
+command = ["node", "-e", "if (+process.versions.node.split('.')[0] < 18) { console.error('herdr-usage needs Node.js 18+, found ' + process.version); process.exit(1) }"]
+
+[[startup]]
+platforms = ["linux", "macos"]
+command = ["node", "src/cli.js", "publish"]
+
+[[events]]
+on = "pane.agent_detected"
+platforms = ["linux", "macos"]
+command = ["node", "src/cli.js", "publish"]
+
+[[actions]]
+id = "refresh"
+title = "Refresh usage"
+description = "Read Claude/Codex usage now and update the agents sidebar."
+contexts = ["global"]
+command = ["node", "src/cli.js", "publish"]
+
+[[actions]]
+id = "install-hooks"
+title = "Install usage hooks"
+description = "Add the Claude Code statusLine and the Codex Stop hook that refresh usage (backs up both files)."
+contexts = ["global"]
+command = ["node", "src/cli.js", "install"]
+
+[[actions]]
+id = "uninstall-hooks"
+title = "Uninstall usage hooks"
+description = "Remove the Claude Code statusLine and Codex Stop hook. Run before `herdr plugin uninstall`."
+contexts = ["global"]
+command = ["node", "src/cli.js", "uninstall"]

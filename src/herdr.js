@@ -13,7 +13,7 @@ const WINDOW_TOKENS = ["herdr_usage_1", "herdr_usage_2"];
 const ICON_TOKEN = "herdr_usage_icon";
 const TOKENS = [...WINDOW_TOKENS, ICON_TOKEN];
 
-// Private Use codepoints drawn by fonts/HerdrUsageIcons.otf (see tools/build-font.py).
+// Private Use codepoints drawn by fonts/HerdrUsageIcons.ttf (see tools/build-font.py).
 const ICONS = { claude: "\u{10FFE1}", codex: "\u{10FFE2}" };
 
 // Wanted value per TOKENS slot, or null. The logo lives as long as the

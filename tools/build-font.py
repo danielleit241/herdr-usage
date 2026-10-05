@@ -2,11 +2,12 @@
 # requires-python = ">=3.9"
 # dependencies = ["fonttools>=4.50", "skia-pathops>=0.8"]
 # ///
-"""Build fonts/HerdrUsageIcons.otf from assets/*.svg.
+"""Build fonts/HerdrUsageIcons.ttf from assets/*.svg.
 
 Each logo becomes one single-color glyph in the Unicode Private Use Area. All
 paths of a logo are combined with the even-odd rule, so a filled shape on top of
-a background is cut out of it (the Codex cloud out of its tile). Adapted from
+a background is cut out of it (the Codex cloud out of its tile). TrueType outlines, because
+DirectWrite (Windows Terminal) handles them more reliably than CFF. Adapted from
 adihex/herdr-agent-icons (MIT).
 
 Run:  uv run tools/build-font.py
@@ -18,7 +19,8 @@ from pathlib import Path
 import pathops
 from fontTools.fontBuilder import FontBuilder
 from fontTools.misc.transform import Transform
-from fontTools.pens.t2CharStringPen import T2CharStringPen
+from fontTools.pens.cu2quPen import Cu2QuPen
+from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.svgLib.path import parse_path
 
@@ -48,22 +50,24 @@ def svg_to_glyph(svg_path):
     # Resolve the even-odd overlaps into clean contours that any rasterizer
     # (non-zero winding) fills the same way.
     shape.simplify(fix_winding=True)
-    out = T2CharStringPen(UPM, None)
-    shape.draw(out)
-    return out.getCharString()
+    out = TTGlyphPen(None)
+    # TrueType wants quadratic curves and clockwise outer contours.
+    shape.draw(Cu2QuPen(out, max_err=1, reverse_direction=True))
+    return out.glyph()
 
 
 def main():
-    names = [".notdef", *GLYPHS]
-    charstrings = {".notdef": T2CharStringPen(UPM, None).getCharString()}
+    # A space keeps the BMP cmap subtable non-empty.
+    names = [".notdef", "space", *GLYPHS]
+    glyphs = {".notdef": TTGlyphPen(None).glyph(), "space": TTGlyphPen(None).glyph()}
     for name, (svg, _) in GLYPHS.items():
-        charstrings[name] = svg_to_glyph(ROOT / "assets" / svg)
+        glyphs[name] = svg_to_glyph(ROOT / "assets" / svg)
 
-    fb = FontBuilder(UPM, isTTF=False)
+    fb = FontBuilder(UPM, isTTF=True)
     fb.setupGlyphOrder(names)
-    fb.setupCharacterMap({cp: name for name, (_, cp) in GLYPHS.items()})
-    fb.setupCFF(f"{FAMILY}-Regular", {"FullName": f"{FAMILY} Regular", "FamilyName": FAMILY}, charstrings, {})
-    fb.setupHorizontalMetrics({n: (UPM, 0) for n in names})
+    fb.setupCharacterMap({0x20: "space", **{cp: name for name, (_, cp) in GLYPHS.items()}})
+    fb.setupGlyf(glyphs)
+    fb.setupHorizontalMetrics({n: (UPM, glyphs[n].xMin if hasattr(glyphs[n], "xMin") else 0) for n in names})
     fb.setupHorizontalHeader(ascent=UPM, descent=0)
     fb.setupNameTable({
         "familyName": FAMILY,
@@ -71,11 +75,13 @@ def main():
         "uniqueFontIdentifier": f"{FAMILY} Regular",
         "fullName": f"{FAMILY} Regular",
         "psName": f"{FAMILY}-Regular",
-        "version": "Version 2.0",
+        "version": "Version 3.0",
     })
-    fb.setupOS2(sTypoAscender=UPM, sTypoDescender=0, usWinAscent=UPM, usWinDescent=0)
+    # ulUnicodeRange bit 90: Supplementary Private Use Area planes 15/16.
+    fb.setupOS2(sTypoAscender=UPM, sTypoDescender=0, usWinAscent=UPM, usWinDescent=0,
+                usWeightClass=400, ulUnicodeRange3=1 << (90 - 64), ulCodePageRange1=1)
     fb.setupPost()
-    out = ROOT / "fonts" / f"{FAMILY}.otf"
+    out = ROOT / "fonts" / f"{FAMILY}.ttf"
     out.parent.mkdir(exist_ok=True)
     fb.save(out)
     print(f"wrote {out.relative_to(ROOT)}")

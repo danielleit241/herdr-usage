@@ -123,7 +123,7 @@ Requirements: herdr 0.9.0+ and Node.js 18+ on `PATH`.
    herdr plugin action invoke herdr-usage.install-font
    ```
 
-   This installs `HerdrUsageIcons.otf` for your user only (macOS `~/Library/Fonts`,
+   This installs `HerdrUsageIcons.ttf` for your user only (macOS `~/Library/Fonts`,
    Linux `~/.local/share/fonts`, Windows `%LOCALAPPDATA%\Microsoft\Windows\Fonts` plus
    its `HKCU` registry entry). **Fully quit and reopen your terminal app** so it loads
    the font. Then put the icon token in front of `agent`, so the usage row keeps its
@@ -223,7 +223,7 @@ herdr plugin link .
 herdr plugin action invoke herdr-usage.install-hooks
 ```
 
-`fonts/HerdrUsageIcons.otf` is built from `assets/*.svg` and committed, so users need
+`fonts/HerdrUsageIcons.ttf` is built from `assets/*.svg` and committed, so users need
 no build step. After changing a logo, rebuild it with `uv run tools/build-font.py`.
 
 ## License

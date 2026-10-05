@@ -3,6 +3,8 @@
 ## 0.2.1 - 2026-10-05
 
 - README: put `$herdr_usage_icon` in front of `agent`, so the usage row is not cut off.
+- Font is now TrueType (`HerdrUsageIcons.ttf`); on Windows `install-font` also loads it
+  and broadcasts the font change, like Explorer "Install". It removes the 0.2.0 `.otf`.
 - README: Windows Terminal needs `HerdrUsageIcons` in its font list, otherwise it
   shows `?`.
 

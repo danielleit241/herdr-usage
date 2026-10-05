@@ -66,7 +66,7 @@ Requirements: herdr 0.9.0+ and Node.js 18+ on `PATH`.
 
    This installs the latest release: herdr checks out the repository's default branch,
    which is `release` and only moves when a version is published. Development happens
-   on `main`. To pin a version, add `--ref v0.2.0`. To update, run the same command
+   on `main`. To pin a version, add `--ref v0.2.1`. To update, run the same command
    again.
 
 2. Wire the agent hooks:
@@ -126,13 +126,24 @@ Requirements: herdr 0.9.0+ and Node.js 18+ on `PATH`.
    This installs `HerdrUsageIcons.otf` for your user only (macOS `~/Library/Fonts`,
    Linux `~/.local/share/fonts`, Windows `%LOCALAPPDATA%\Microsoft\Windows\Fonts` plus
    its `HKCU` registry entry). **Fully quit and reopen your terminal app** so it loads
-   the font. Then put the icon token first in each usage row:
+   the font. Then put the icon token in front of `agent`, so the usage row keeps its
+   width:
 
    ```toml
    # claude
-   [{ token = "$herdr_usage_icon", fg = "#D97757" }, { token = "$herdr_usage_1", rules = [...] }, ...],
+   [{ token = "$herdr_usage_icon", fg = "#D97757" }, "agent"],
    # codex
-   [{ token = "$herdr_usage_icon", fg = "#7A9DFF" }, { token = "$herdr_usage_1", rules = [...] }, ...],
+   [{ token = "$herdr_usage_icon", fg = "#7A9DFF" }, "agent"],
+   ```
+
+   The icon shows on the pane that carries the usage row.
+
+   **Windows Terminal** does not use per-user fonts for missing glyphs on its own and
+   shows `?` instead. List the font after your main font in `settings.json`
+   (`profiles.defaults`, or one profile):
+
+   ```json
+   "font": { "face": "Cascadia Mono, HerdrUsageIcons" }
    ```
 
    The logos are single-color glyphs in the Unicode Private Use Area (`U+10FFE1`

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 - 2026-10-05
+
+- README: put `$herdr_usage_icon` in front of `agent`, so the usage row is not cut off.
+- README: Windows Terminal needs `HerdrUsageIcons` in its font list, otherwise it
+  shows `?`.
+
 ## 0.2.0 - 2026-10-05
 
 - Provider logos: new `$herdr_usage_icon` token (Claude Code `U+10FFE1`, Codex `U+10FFE2`)

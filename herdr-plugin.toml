@@ -8,7 +8,7 @@
 
 id = "herdr-usage"
 name = "herdr-usage"
-version = "0.2.0"
+version = "0.2.1"
 description = "Claude Code + Codex usage (5h / weekly) in the agents sidebar."
 min_herdr_version = "0.9.0"
 platforms = ["linux", "macos", "windows"]

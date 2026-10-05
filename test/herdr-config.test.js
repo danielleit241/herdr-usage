@@ -195,7 +195,8 @@ test("setupRows validates the original and the candidate, then replaces the file
   const result = hc.setupRows(env, { exec: make(), platform: "linux" });
   assert.equal(result.changed, true);
   assert.match(result.lines.join("\n"), /sidebar rows set/);
-  assert.deepEqual(calls.map((c) => c.file), [file, `${file}.${process.pid}.herdr-usage.tmp`]);
+  // The candidate sits next to the real file (on macOS the tmp dir is behind a symlink).
+  assert.deepEqual(calls.map((c) => c.file), [file, `${fs.realpathSync(file)}.${process.pid}.herdr-usage.tmp`]);
   assert.ok(calls.every((c) => c.bin === "herdr-stub" && c.args.join(" ") === "config check"));
   assert.equal(hc.stripBlock(read(file)), original);
   assert.ok(read(file).includes("#a3be8c"), "nord green");

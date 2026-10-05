@@ -120,6 +120,30 @@ Requirements: herdr 0.9.0+ and Node.js 18+ on `PATH`.
    The usage row only appears on the pane that carries the tokens. Panes without them
    keep their normal two lines.
 
+4. Optional: show the Claude and Codex logos in front of the usage row.
+
+   ```sh
+   herdr plugin action invoke herdr-usage.install-font
+   ```
+
+   This installs `HerdrUsageIcons.otf` for your user only (macOS `~/Library/Fonts`,
+   Linux `~/.local/share/fonts`, Windows `%LOCALAPPDATA%\Microsoft\Windows\Fonts` plus
+   its `HKCU` registry entry). **Fully quit and reopen your terminal app** so it loads
+   the font. Then put the icon token first in each usage row:
+
+   ```toml
+   # claude
+   [{ token = "$herdr_usage_icon", fg = "#D97757" }, { token = "$herdr_usage_1", rules = [...] }, ...],
+   # codex
+   [{ token = "$herdr_usage_icon" }, { token = "$herdr_usage_1", rules = [...] }, ...],
+   ```
+
+   The logos are single glyphs in the Unicode Private Use Area (`U+100001` Claude,
+   `U+100003` Codex), the same codepoints as
+   [herdr-agent-icons](https://github.com/adihex/herdr-agent-icons), so either font
+   draws them. Without the font the terminal shows an empty box; leave the token out
+   of your config in that case.
+
 The numbers appear after the next Claude statusLine update or Codex turn. Run
 `herdr plugin action invoke herdr-usage.refresh` to publish them immediately.
 
@@ -130,6 +154,7 @@ keep calling a script that no longer exists.
 
 ```sh
 herdr plugin action invoke herdr-usage.uninstall-hooks
+herdr plugin action invoke herdr-usage.uninstall-font   # if you installed it
 herdr plugin uninstall herdr-usage
 ```
 
@@ -142,6 +167,8 @@ Then remove the `rows_by_agent` lines from `config.toml`.
 | `herdr-usage.refresh` | Publish usage to the sidebar now |
 | `herdr-usage.install-hooks` | Wire the Claude statusLine and the Codex `Stop` hook |
 | `herdr-usage.uninstall-hooks` | Undo `install-hooks` and restore a chained statusLine |
+| `herdr-usage.install-font` | Install the logo font for `$herdr_usage_icon` (current user) |
+| `herdr-usage.uninstall-font` | Remove that font |
 
 `node src/cli.js status` (from the plugin directory) prints the normalized state of every
 provider as JSON, which helps when a number does not show up.
@@ -167,7 +194,9 @@ everything herdr-usage does:
   conversation content, and never reads credentials or OAuth tokens.
 - **Writes** its cache to herdr's plugin state directory (`HERDR_PLUGIN_STATE_DIR`),
   plus the two hook entries and their one-time `*.herdr-usage.bak` backups described in
-  [Install](#install). It does not write to the plugin checkout or to herdr's config.
+  [Install](#install). `install-font` copies one font file to your user font folder
+  (and on Windows adds its `HKCU` font entry). It does not write to the plugin
+  checkout or to herdr's config.
 - **Network**: none. All data is local.
 - **herdr**: uses the public CLI only (`agent list`, `pane report-metadata` with its own
   `--source herdr-usage`). Tokens are display-only, expire by TTL and are not
@@ -187,7 +216,14 @@ herdr plugin link .
 herdr plugin action invoke herdr-usage.install-hooks
 ```
 
+`fonts/HerdrUsageIcons.otf` is built from `assets/*.svg` and committed, so users need
+no build step. After changing a logo, rebuild it with `uv run tools/build-font.py`.
+
 ## License
 
-MIT. Claude is a trademark of Anthropic, and Codex of OpenAI; the icons in `assets/`
-only identify the supported tools. This project is not affiliated with either company.
+MIT. `tools/build-font.py` is adapted from
+[adihex/herdr-agent-icons](https://github.com/adihex/herdr-agent-icons)
+(MIT, Copyright (c) 2026 adihex).
+
+Claude is a trademark of Anthropic, and Codex of OpenAI; the logos in `assets/` and
+`fonts/` only identify the supported tools. This project is not affiliated with either company.

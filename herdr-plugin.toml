@@ -46,3 +46,17 @@ title = "Uninstall usage hooks"
 description = "Remove the Claude Code statusLine and Codex Stop hook. Run before `herdr plugin uninstall`."
 contexts = ["global"]
 command = ["node", "src/cli.js", "uninstall"]
+
+[[actions]]
+id = "install-font"
+title = "Install logo font"
+description = "Install the Claude/Codex logo font for the current user (for the $herdr_usage_icon token)."
+contexts = ["global"]
+command = ["node", "src/cli.js", "install-font"]
+
+[[actions]]
+id = "uninstall-font"
+title = "Uninstall logo font"
+description = "Remove the logo font installed by install-font."
+contexts = ["global"]
+command = ["node", "src/cli.js", "uninstall-font"]

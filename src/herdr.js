@@ -6,9 +6,26 @@ const { execFileSync } = require("node:child_process");
 const { windowTokens } = require("./usage");
 const { PLUGIN_ID } = require("./paths");
 
-// One token per window slot (Claude five_hour/seven_day, Codex primary/secondary).
-// Pane tokens share one map per pane, so the names carry the plugin prefix.
-const TOKENS = ["herdr_usage_1", "herdr_usage_2"];
+// One token per window slot (Claude five_hour/seven_day, Codex primary/secondary),
+// plus the provider logo. Pane tokens share one map per pane, so the names carry
+// the plugin prefix.
+const WINDOW_TOKENS = ["herdr_usage_1", "herdr_usage_2"];
+const ICON_TOKEN = "herdr_usage_icon";
+const TOKENS = [...WINDOW_TOKENS, ICON_TOKEN];
+
+// Private Use codepoints drawn by fonts/HerdrUsageIcons.otf (see tools/build-font.py).
+const ICONS = { claude: "\u{100001}", codex: "\u{100003}" };
+
+// Wanted value per TOKENS slot, or null. The logo lives as long as the
+// longest-lived window, so it never shows without numbers next to it.
+function wantedTokens(state, nowSec) {
+  const windows = windowTokens(state, nowSec, WINDOW_TOKENS.length);
+  const live = windows.filter(Boolean);
+  const icon = live.length && ICONS[state.provider]
+    ? { value: ICONS[state.provider], ttlMs: Math.max(...live.map((t) => t.ttlMs)) }
+    : null;
+  return [...windows, icon];
+}
 
 function herdrBin(env = process.env) {
   return env.HERDR_BIN_PATH || "herdr";
@@ -38,7 +55,7 @@ function planReports(agents, statesByProvider, nowSec) {
     const state = statesByProvider[agent.agent];
     const isOwner = Boolean(state) && !owners.has(agent.agent);
     if (state) owners.add(agent.agent);
-    const wanted = isOwner ? windowTokens(state, nowSec, TOKENS.length) : TOKENS.map(() => null);
+    const wanted = isOwner ? wantedTokens(state, nowSec) : TOKENS.map(() => null);
     const current = agent.tokens || {};
     const report = { paneId: agent.pane_id, set: [], clear: [] };
     TOKENS.forEach((name, i) => {
@@ -87,4 +104,4 @@ function publish(states, env = process.env, now = Date.now()) {
   return { updated, failed };
 }
 
-module.exports = { TOKENS, planReports, reportCommands, publish };
+module.exports = { TOKENS, ICONS, planReports, reportCommands, publish };

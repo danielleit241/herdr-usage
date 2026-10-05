@@ -7,6 +7,8 @@
 //   codex-hook         Codex Stop hook: publish
 //   install            wire the Claude statusLine and the Codex Stop hook
 //   uninstall          undo `install`
+//   install-font       install the logo font for the current user
+//   uninstall-font     undo `install-font`
 //
 // Hook commands never fail the calling agent: they always exit 0. The statusLine
 // prints only the output of a statusLine it chained at install time.
@@ -19,6 +21,7 @@ const claude = require("./providers/claude");
 const codex = require("./providers/codex");
 const herdr = require("./herdr");
 const installer = require("./install");
+const font = require("./font");
 const { windowTokens } = require("./usage");
 
 const STATUSLINE_PUBLISH_INTERVAL_MS = 15_000;
@@ -136,8 +139,14 @@ function main(command) {
     case "uninstall":
       for (const line of installer[command]()) process.stdout.write(`${line}\n`);
       return;
+    case "install-font":
+      for (const line of font.installFont()) process.stdout.write(`${line}\n`);
+      return;
+    case "uninstall-font":
+      for (const line of font.uninstallFont()) process.stdout.write(`${line}\n`);
+      return;
     default:
-      process.stderr.write("usage: herdr-usage <status|publish|install|uninstall|claude-statusline|codex-hook>\n");
+      process.stderr.write("usage: herdr-usage <status|publish|install|uninstall|install-font|uninstall-font|claude-statusline|codex-hook>\n");
       process.exitCode = 2;
   }
 }

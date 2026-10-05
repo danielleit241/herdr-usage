@@ -7,7 +7,7 @@ const path = require("node:path");
 const { windowTokens, windowLabel, levelGlyph } = require("../src/usage");
 const claude = require("../src/providers/claude");
 const codex = require("../src/providers/codex");
-const { planReports, reportCommands } = require("../src/herdr");
+const { ICONS, planReports, reportCommands } = require("../src/herdr");
 
 const NOW = 1_791_200_000;
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "herdr-usage-"));
@@ -172,17 +172,34 @@ test("planReports shows each provider once and clears the other panes", () => {
     { pane_id: "p2", agent: "pi", tokens: { herdr_usage_1: "○ 5h 9%" } }, // was a claude pane
   ];
   assert.deepEqual(planReports(agents, states, NOW), [
-    { paneId: "c1", set: [{ name: "herdr_usage_1", value: "○ 5h 10%", ttlMs: 60_000 }], clear: ["herdr_usage_2"] },
+    {
+      paneId: "c1",
+      set: [
+        { name: "herdr_usage_1", value: "○ 5h 10%", ttlMs: 60_000 },
+        { name: "herdr_usage_icon", value: ICONS.claude, ttlMs: 60_000 },
+      ],
+      clear: ["herdr_usage_2"],
+    },
     { paneId: "c2", set: [], clear: ["herdr_usage_1"] },
-    { paneId: "x1", set: [{ name: "herdr_usage_2", value: "● wk 90%", ttlMs: 90_000 }], clear: [] },
+    {
+      paneId: "x1",
+      set: [
+        { name: "herdr_usage_2", value: "● wk 90%", ttlMs: 90_000 },
+        { name: "herdr_usage_icon", value: ICONS.codex, ttlMs: 90_000 },
+      ],
+      clear: [],
+    },
     { paneId: "p2", set: [], clear: ["herdr_usage_1"] },
   ]);
 });
 
 test("planReports clears tokens of an unavailable provider", () => {
   const states = { claude: { provider: "claude", status: "unavailable", windows: [] } };
-  const agents = [{ pane_id: "c1", agent: "claude", tokens: { herdr_usage_1: "○ 5h 1%", herdr_usage_2: "○ wk 1%" } }];
-  assert.deepEqual(planReports(agents, states, NOW), [{ paneId: "c1", set: [], clear: ["herdr_usage_1", "herdr_usage_2"] }]);
+  const tokens = { herdr_usage_1: "○ 5h 1%", herdr_usage_2: "○ wk 1%", herdr_usage_icon: ICONS.claude };
+  const agents = [{ pane_id: "c1", agent: "claude", tokens }];
+  assert.deepEqual(planReports(agents, states, NOW), [
+    { paneId: "c1", set: [], clear: ["herdr_usage_1", "herdr_usage_2", "herdr_usage_icon"] },
+  ]);
 });
 
 test("reportCommands sets each token with its own TTL, then clears", () => {

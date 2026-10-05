@@ -1,12 +1,9 @@
 # herdr-usage
 
 <p>
-  <img src="assets/claude.svg" alt="Claude Code" height="32">
+  <img src="assets/claude-code.svg" alt="Claude Code" height="32">
   &nbsp;
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/codex-dark.svg">
-    <img src="assets/codex.svg" alt="Codex" height="32">
-  </picture>
+  <img src="assets/codex.svg" alt="Codex" height="32">
 </p>
 
 A [herdr](https://github.com/herdrdev/herdr) plugin that shows your **Claude Code** and
@@ -135,14 +132,13 @@ Requirements: herdr 0.9.0+ and Node.js 18+ on `PATH`.
    # claude
    [{ token = "$herdr_usage_icon", fg = "#D97757" }, { token = "$herdr_usage_1", rules = [...] }, ...],
    # codex
-   [{ token = "$herdr_usage_icon" }, { token = "$herdr_usage_1", rules = [...] }, ...],
+   [{ token = "$herdr_usage_icon", fg = "#7A9DFF" }, { token = "$herdr_usage_1", rules = [...] }, ...],
    ```
 
-   The logos are single glyphs in the Unicode Private Use Area (`U+100001` Claude,
-   `U+100003` Codex), the same codepoints as
-   [herdr-agent-icons](https://github.com/adihex/herdr-agent-icons), so either font
-   draws them. Without the font the terminal shows an empty box; leave the token out
-   of your config in that case.
+   The logos are single-color glyphs in the Unicode Private Use Area (`U+10FFE1`
+   Claude Code, `U+10FFE2` Codex), away from the range other icon fonts use. The `fg`
+   sets their color. Without the font the terminal shows an empty box; leave the
+   token out of your config in that case.
 
 The numbers appear after the next Claude statusLine update or Codex turn. Run
 `herdr plugin action invoke herdr-usage.refresh` to publish them immediately.

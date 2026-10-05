@@ -2,7 +2,7 @@
 
 ## 0.2.0 - unreleased
 
-- Provider logos: new `$herdr_usage_icon` token (Claude `U+100001`, Codex `U+100003`)
+- Provider logos: new `$herdr_usage_icon` token (Claude Code `U+10FFE1`, Codex `U+10FFE2`)
   on the usage row, drawn by the bundled `HerdrUsageIcons.otf`.
 - `install-font` / `uninstall-font` actions: per-user font install on macOS, Linux and
   Windows (no admin rights).

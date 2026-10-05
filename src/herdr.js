@@ -14,7 +14,7 @@ const ICON_TOKEN = "herdr_usage_icon";
 const TOKENS = [...WINDOW_TOKENS, ICON_TOKEN];
 
 // Private Use codepoints drawn by fonts/HerdrUsageIcons.otf (see tools/build-font.py).
-const ICONS = { claude: "\u{100001}", codex: "\u{100003}" };
+const ICONS = { claude: "\u{10FFE1}", codex: "\u{10FFE2}" };
 
 // Wanted value per TOKENS slot, or null. The logo lives as long as the
 // longest-lived window, so it never shows without numbers next to it.

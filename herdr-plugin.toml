@@ -1,21 +1,27 @@
-# herdr-usage: shows Claude Code and Codex subscription usage (5h / weekly %)
-# in the herdr agents sidebar through the `$usage` pane token.
+# herdr-usage: shows the subscription usage of each supported agent provider
+# (5h / weekly %) in the herdr agents sidebar through `$herdr_usage_*` pane tokens.
 #
 # The agents drive refresh themselves (Claude statusLine, Codex Stop hook,
-# wired by the `install-hooks` action). Herdr hooks add an immediate refresh
-# when an agent appears, on linux/macos only: on Windows 11 every console
-# process started from a herdr hook flashes a Windows Terminal window.
+# wired by the setup build step below and the `setup` action). Herdr hooks add an
+# immediate refresh when an agent appears, on linux/macos only: on Windows 11 every
+# console process started from a herdr hook flashes a Windows Terminal window.
 
 id = "herdr-usage"
 name = "herdr-usage"
 version = "0.2.1"
 description = "AI agent subscription usage (5h / weekly) in the agents sidebar, one row per provider (Claude Code, Codex)."
-min_herdr_version = "0.9.0"
+min_herdr_version = "0.9.3"
 platforms = ["linux", "macos", "windows"]
 
 # No dependencies to install: only fail early when Node.js is missing or too old.
 [[build]]
 command = ["node", "-e", "if (+process.versions.node.split('.')[0] < 18) { console.error('herdr-usage needs Node.js 18+, found ' + process.version); process.exit(1) }"]
+
+# Set up everything herdr-usage needs. herdr prints this command in the install
+# preview and asks before it runs; the text after `--` is ignored and only tells
+# the user what changes. Undo it with the `uninstall` action.
+[[build]]
+command = ["node", "src/cli.js", "setup", "--build", "--", "edits each supported agent's config (Claude Code statusLine, Codex Stop hook) and herdr config.toml (sidebar rows), installs the logo font, keeps *.herdr-usage.bak backups; undo: herdr plugin action invoke herdr-usage.uninstall"]
 
 [[startup]]
 platforms = ["linux", "macos"]
@@ -34,29 +40,15 @@ contexts = ["global"]
 command = ["node", "src/cli.js", "publish"]
 
 [[actions]]
-id = "install-hooks"
-title = "Install usage hooks"
-description = "Add the refresh hook of every installed provider tool (Claude Code statusLine, Codex Stop hook); backs up each file."
+id = "setup"
+title = "Set up herdr-usage"
+description = "Install the logo font and the hook launcher, wire each supported agent, and add the usage rows to herdr config.toml. Run again after you change your theme, sidebar rows or Windows Terminal font."
 contexts = ["global"]
-command = ["node", "src/cli.js", "install"]
+command = ["node", "src/cli.js", "setup"]
 
 [[actions]]
-id = "uninstall-hooks"
-title = "Uninstall usage hooks"
-description = "Remove the refresh hooks of every provider. Run before `herdr plugin uninstall`."
+id = "uninstall"
+title = "Undo herdr-usage setup"
+description = "Undo what setup changed: agent hooks, config.toml rows, logo font. Run it before `herdr plugin uninstall`."
 contexts = ["global"]
 command = ["node", "src/cli.js", "uninstall"]
-
-[[actions]]
-id = "install-font"
-title = "Install logo font"
-description = "Install the provider logo font for the current user (for the $herdr_usage_icon token)."
-contexts = ["global"]
-command = ["node", "src/cli.js", "install-font"]
-
-[[actions]]
-id = "uninstall-font"
-title = "Uninstall logo font"
-description = "Remove the logo font installed by install-font."
-contexts = ["global"]
-command = ["node", "src/cli.js", "uninstall-font"]

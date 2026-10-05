@@ -108,4 +108,4 @@ function publish(states, env = process.env, now = Date.now()) {
   return { updated, failed };
 }
 
-module.exports = { TOKENS, ICONS, planReports, reportCommands, publish };
+module.exports = { TOKENS, ICONS, herdrBin, planReports, reportCommands, publish };

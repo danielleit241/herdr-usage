@@ -9,11 +9,11 @@
 // The file is installed under a content-hashed name: a terminal keeps the font
 // it loaded locked, so an update writes a new file instead of overwriting it.
 
-const { execFileSync } = require("node:child_process");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { run } = require("./exec");
 
 const SOURCE = path.join(__dirname, "..", "fonts", "HerdrUsageIcons.ttf");
 // Every font file this plugin has installed: hashed .ttf, and 0.2.0's .otf.
@@ -56,10 +56,6 @@ function ownedFiles(dir) {
   } catch {
     return [];
   }
-}
-
-function run(file, args, env) {
-  execFileSync(file, args, { stdio: "ignore", windowsHide: true, timeout: 30_000, env: { ...process.env, ...env } });
 }
 
 function winFontResource(exec, op, file) {
@@ -114,7 +110,8 @@ function installFont(env = process.env, platform = process.platform, exec = run)
     // fontconfig is optional; most terminals rescan the directory on start
     tryExec(() => exec("fc-cache", ["-f", dir]));
   }
-  return [...lines, `font: installed ${target}`, RESTART];
+  // Only a new file needs the restart: the terminal already loaded an installed one.
+  return [...lines, `font: installed ${target}`, ...(copied ? [RESTART] : [])];
 }
 
 function uninstallFont(env = process.env, platform = process.platform, exec = run) {
@@ -130,4 +127,4 @@ function uninstallFont(env = process.env, platform = process.platform, exec = ru
   return lines.length ? lines : ["font: not installed"];
 }
 
-module.exports = { fontDir, installFont, uninstallFont, WIN_FONT_NAME };
+module.exports = { fontDir, installFont, uninstallFont, WIN_FONT_NAME, RESTART };

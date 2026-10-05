@@ -2,12 +2,18 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { hookPath } = require("./launcher");
 
-const CLI = path.resolve(__dirname, "cli.js").replace(/\\/g, "/");
-const command = (sub) => `node "${CLI}" ${sub}`;
-// Ours: `node "<plugin root>/src/cli.js" <sub>`, from this or another plugin directory.
+// Tools run the launcher in the plugin config dir (src/launcher.js), not the plugin
+// checkout: that dir survives an update, and the launcher exits quietly once the
+// plugin is uninstalled.
+const command = (sub, env = process.env) => `node "${hookPath(env).replace(/\\/g, "/")}" ${sub}`;
+// Ours: the launcher form `node ".../herdr-usage/hook.js" <sub>`, or the form of
+// 0.2.x, `node "<plugin root>/src/cli.js" <sub>`, from any plugin directory.
 const isOurs = (cmd, sub) =>
-  typeof cmd === "string" && /^node ".*[\\/]src[\\/]cli\.js" /.test(cmd) && cmd.trimEnd().endsWith(` ${sub}`);
+  typeof cmd === "string" &&
+  /^node ".*[\\/](src[\\/]cli\.js|herdr-usage[\\/]hook\.js)" /.test(cmd) &&
+  cmd.trimEnd().endsWith(` ${sub}`);
 
 function readJson(file, fallback) {
   let text;

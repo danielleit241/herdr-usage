@@ -143,10 +143,10 @@ function codexHooksNote(env) {
     : "codex: note: enable hooks with `[features] hooks = true` in config.toml";
 }
 
-function installHook(file) {
+function installHook(file, env) {
   const config = readJson(file, {});
   const stop = stopGroups(config, file);
-  const next = [...withoutOurs(stop), { hooks: [{ type: "command", command: command("codex-hook"), timeout: 10 }] }];
+  const next = [...withoutOurs(stop), { hooks: [{ type: "command", command: command("codex-hook", env), timeout: 10 }] }];
   if (JSON.stringify(next) === JSON.stringify(stop)) return `codex: already installed (${file})`;
   editJson(file, { ...config, hooks: { ...(config.hooks || {}), Stop: next } });
   return `codex: Stop hook installed (${file})`;
@@ -157,7 +157,7 @@ function install(env = process.env) {
   const note = codexHooksNote(env);
   let line;
   try {
-    line = installHook(hooksPath(env));
+    line = installHook(hooksPath(env), env);
   } catch (err) {
     line = `codex: error: ${err.message}`;
   }

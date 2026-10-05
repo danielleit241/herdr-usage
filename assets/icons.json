@@ -1,4 +1,4 @@
 {
-  "claude": { "svg": "claude-color.svg", "codepoint": "10FFE1" },
-  "codex": { "svg": "codex-color.svg", "codepoint": "10FFE2" }
+  "claude": { "svg": "claude-color.svg", "codepoint": "10FFE1", "color": "#D97757" },
+  "codex": { "svg": "codex-color.svg", "codepoint": "10FFE2", "color": "#7A9DFF" }
 }

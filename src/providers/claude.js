@@ -90,7 +90,7 @@ function install(env = process.env) {
   const file = settingsPath(env);
   const settings = readJson(file, {});
   const current = settings.statusLine;
-  const wanted = command("claude-statusline");
+  const wanted = command("claude-statusline", env);
   if (current && current.command === wanted) return [`claude: already installed (${file})`];
   if (current && isOurs(current.command, "claude-statusline")) {
     // An install from another plugin directory: repoint it, keep the chained statusLine.

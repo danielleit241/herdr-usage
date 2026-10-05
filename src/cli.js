@@ -3,10 +3,12 @@
 //
 //   status             print the normalized usage state of every provider (JSON)
 //   publish            push usage to herdr agent panes
-//   install            wire every provider's tool to refresh usage
-//   uninstall          undo `install`
-//   install-font       install the logo font for the current user
-//   uninstall-font     undo `install-font`
+//   setup [--build]    install the logo font and the hook launcher, wire every
+//                      provider's tool to refresh usage, add the sidebar rows to
+//                      herdr's config.toml. `--build` marks the run that
+//                      `herdr plugin install` starts. Arguments after `--` are
+//                      ignored: they only describe the change in herdr's preview.
+//   uninstall          undo `setup`
 //   <hook>             commands the tools run, listed by each provider (src/providers)
 //
 // Hook commands never fail the calling agent: they always exit 0.
@@ -16,13 +18,13 @@ const path = require("node:path");
 const paths = require("./paths");
 const providers = require("./providers");
 const herdr = require("./herdr");
-const installer = require("./install");
-const font = require("./font");
+const launcher = require("./launcher");
+const setup = require("./setup");
 const { readJson } = require("./config-files");
 const { windowTokens } = require("./usage");
 
 const STATUSLINE_PUBLISH_INTERVAL_MS = 15_000;
-const COMMANDS = ["status", "publish", "install", "uninstall", "install-font", "uninstall-font"];
+const COMMANDS = ["status", "publish", "setup", "uninstall"];
 
 function readStates(env = process.env) {
   return providers.readAll(env);
@@ -94,7 +96,16 @@ function runHook(handler, env = process.env) {
   }
 }
 
-function main(command) {
+// An update or relink can leave hook.js pointing at a directory that is gone.
+function healLauncher() {
+  try {
+    launcher.healHook();
+  } catch {
+    // best effort
+  }
+}
+
+function main(command, args = []) {
   const hooks = providers.hookHandlers();
   if (Object.hasOwn(hooks, command)) {
     runHook(hooks[command]);
@@ -105,21 +116,20 @@ function main(command) {
       process.stdout.write(`${JSON.stringify(readStates(), null, 2)}\n`);
       return;
     case "publish": {
+      healLauncher();
       const { updated, failed } = herdr.publish(readStates());
       process.stdout.write(`updated ${updated} pane(s)\n`);
       for (const message of failed) process.stderr.write(`failed: ${message}\n`);
       if (failed.length) process.exitCode = 1;
       return;
     }
-    case "install":
+    case "setup": {
+      const own = args.includes("--") ? args.slice(0, args.indexOf("--")) : args;
+      for (const line of setup.setup(process.env, { build: own.includes("--build") })) process.stdout.write(`${line}\n`);
+      return;
+    }
     case "uninstall":
-      for (const line of installer[command]()) process.stdout.write(`${line}\n`);
-      return;
-    case "install-font":
-      for (const line of font.installFont()) process.stdout.write(`${line}\n`);
-      return;
-    case "uninstall-font":
-      for (const line of font.uninstallFont()) process.stdout.write(`${line}\n`);
+      for (const line of setup.uninstall()) process.stdout.write(`${line}\n`);
       return;
     default:
       process.stderr.write(`usage: herdr-usage <${[...COMMANDS, ...Object.keys(hooks)].join("|")}>\n`);
@@ -127,6 +137,6 @@ function main(command) {
   }
 }
 
-if (require.main === module) main(process.argv[2]);
+if (require.main === module) main(process.argv[2], process.argv.slice(3));
 
-module.exports = { COMMANDS, readStates, signature, publishDue, publishAndRecord };
+module.exports = { COMMANDS, main, readStates, signature, publishDue, publishAndRecord };

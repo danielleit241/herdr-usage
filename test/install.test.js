@@ -6,6 +6,7 @@ const path = require("node:path");
 
 const { install, uninstall } = require("../src/install");
 const { chainPath } = require("../src/providers/claude");
+const { isOurs, command } = require("../src/config-files");
 
 function sandbox({ claude, codex } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "herdr-usage-install-"));
@@ -13,6 +14,7 @@ function sandbox({ claude, codex } = {}) {
     CLAUDE_CONFIG_DIR: path.join(root, "claude"),
     CODEX_HOME: path.join(root, "codex"),
     HERDR_PLUGIN_STATE_DIR: path.join(root, "state"),
+    XDG_CONFIG_HOME: path.join(root, "config"),
   };
   const files = {
     claude: path.join(env.CLAUDE_CONFIG_DIR, "settings.json"),
@@ -36,10 +38,10 @@ test("install adds statusLine and Stop hook, keeping other config", () => {
   install(env);
   const settings = read("claude");
   assert.equal(settings.theme, "dark");
-  assert.match(settings.statusLine.command, /cli\.js" claude-statusline$/);
+  assert.match(settings.statusLine.command, /herdr-usage\/hook\.js" claude-statusline$/);
   const hooks = read("codex").hooks;
   assert.deepEqual(hooks.SessionStart, herdrSessionStart.SessionStart);
-  assert.match(hooks.Stop[0].hooks[0].command, /cli\.js" codex-hook$/);
+  assert.match(hooks.Stop[0].hooks[0].command, /herdr-usage\/hook\.js" codex-hook$/);
 });
 
 test("install is idempotent", () => {
@@ -177,4 +179,24 @@ test("install notes when Codex hooks are not enabled", () => {
   assert.match(install(env).join("\n"), /\[features\] hooks = true/);
   fs.writeFileSync(path.join(env.CODEX_HOME, "config.toml"), "[features]\nmemories = false\nhooks = true\n");
   assert.doesNotMatch(install(env).join("\n"), /features/);
+});
+
+test("isOurs accepts the launcher form and the old cli.js form, nothing else", () => {
+  const env = { XDG_CONFIG_HOME: "/x" };
+  assert.equal(isOurs(command("codex-hook", env), "codex-hook"), true);
+  assert.equal(isOurs('node "/old/src/cli.js" codex-hook', "codex-hook"), true);
+  assert.equal(isOurs(String.raw`node "C:\old\src\cli.js" codex-hook`, "codex-hook"), true);
+  assert.equal(isOurs(command("codex-hook", env), "claude-statusline"), false);
+  assert.equal(isOurs('node "/x/other/hook.js" codex-hook', "codex-hook"), false);
+  assert.equal(isOurs("other-tool codex-hook", "codex-hook"), false);
+});
+
+test("uninstall removes a hook in the old cli.js form", () => {
+  const { env, read } = sandbox({
+    claude: { statusLine: { type: "command", command: 'node "/old/src/cli.js" claude-statusline' } },
+    codex: { hooks: { Stop: [{ hooks: [{ type: "command", command: 'node "/old/src/cli.js" codex-hook' }] }] } },
+  });
+  uninstall(env);
+  assert.equal(read("claude").statusLine, undefined);
+  assert.equal(read("codex").hooks.Stop, undefined);
 });

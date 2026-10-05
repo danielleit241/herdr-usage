@@ -11,7 +11,7 @@
 //   }
 //
 // A hook gets the stdin text and ctx = { env, now(), write(text), publish({ throttle }) }.
-// Hook names must not match a built-in command (status, publish, install, ...).
+// Hook names must not match a built-in command (status, publish, setup, ...).
 // `write` prints to stdout at once; `publish()` pushes usage to herdr (only inside
 // herdr), and `publish({ throttle: true })` skips it when nothing changed recently.
 //

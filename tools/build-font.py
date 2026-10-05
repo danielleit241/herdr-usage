@@ -104,7 +104,7 @@ def main():
     out = ROOT / "fonts" / f"{FAMILY}.ttf"
     out.parent.mkdir(exist_ok=True)
     # Fixed timestamps: the same sources give the same bytes, so the hashed file
-    # name that install-font uses only changes when a logo changes.
+    # name that `setup` installs only changes when a logo changes.
     fb.font["head"].created = fb.font["head"].modified = 0
     fb.font.recalcTimestamp = False
     fb.save(out)

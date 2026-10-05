@@ -11,7 +11,9 @@ const paths = require("./paths");
 
 const CLI = path.resolve(__dirname, "cli.js").replace(/\\/g, "/");
 const command = (sub) => `node "${CLI}" ${sub}`;
-const isOurs = (cmd, sub) => typeof cmd === "string" && cmd.includes("cli.js") && cmd.trimEnd().endsWith(` ${sub}`);
+// Ours: `node "<plugin root>/src/cli.js" <sub>`, from this or another plugin directory.
+const isOurs = (cmd, sub) =>
+  typeof cmd === "string" && /^node ".*[\\/]src[\\/]cli\.js" /.test(cmd) && cmd.trimEnd().endsWith(` ${sub}`);
 
 function claudeSettingsPath(env = process.env) {
   return path.join(env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"), "settings.json");
@@ -41,10 +43,19 @@ function readJson(file, fallback) {
   }
 }
 
+// Atomic write next to the real file, so a symlinked dotfile stays a symlink
+// and an interrupted write never leaves a truncated config.
 function writeJson(file, value) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}
+  let target = file;
+  try {
+    target = fs.realpathSync(file);
+  } catch {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+  }
+  const tmp = `${target}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, `${JSON.stringify(value, null, 2)}
 `);
+  fs.renameSync(tmp, target);
 }
 
 // Edits a user config file. The first edit keeps the original as *.herdr-usage.bak.
@@ -98,9 +109,11 @@ function stopGroups(config, file) {
 
 // Stop groups without any herdr-usage hook (from this or another plugin directory).
 function withoutOurs(stop) {
+  const ours = (h) => isOurs(h && h.command, "codex-hook");
+  const hasOurs = (group) => Array.isArray(group.hooks) && group.hooks.some(ours);
   return stop
-    .map((group) => ({ ...group, hooks: (group.hooks || []).filter((h) => !isOurs(h.command, "codex-hook")) }))
-    .filter((group) => group.hooks.length > 0);
+    .filter((group) => !(hasOurs(group) && group.hooks.every(ours)))
+    .map((group) => (hasOurs(group) ? { ...group, hooks: group.hooks.filter((h) => !ours(h)) } : group));
 }
 
 // Codex runs hooks.json only with `[features] hooks = true` in config.toml.
@@ -138,12 +151,34 @@ function uninstallCodex(env = process.env) {
   return `codex: Stop hook removed (${file})`;
 }
 
+// Runs each step on its own: one tool's broken config does not block the other,
+// and a tool that is not installed is skipped instead of getting a new config.
+function runSteps(steps) {
+  return steps.map(([name, configDir, step]) => {
+    if (!fs.existsSync(configDir)) return `${name}: skipped (${configDir} not found)`;
+    try {
+      return step();
+    } catch (err) {
+      return `${name}: error: ${err.message}`;
+    }
+  });
+}
+
 function install(env = process.env) {
-  return [installClaude(env), installCodex(env), codexHooksNote(env)].filter(Boolean);
+  const codexDir = paths.codexHome(env);
+  const lines = runSteps([
+    ["claude", path.dirname(claudeSettingsPath(env)), () => installClaude(env)],
+    ["codex", codexDir, () => installCodex(env)],
+  ]);
+  const note = fs.existsSync(codexDir) && codexHooksNote(env);
+  return note ? [...lines, note] : lines;
 }
 
 function uninstall(env = process.env) {
-  return [uninstallClaude(env), uninstallCodex(env)];
+  return runSteps([
+    ["claude", path.dirname(claudeSettingsPath(env)), () => uninstallClaude(env)],
+    ["codex", paths.codexHome(env), () => uninstallCodex(env)],
+  ]);
 }
 
 module.exports = { install, uninstall, chainPath, readJson };

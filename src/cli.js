@@ -19,6 +19,7 @@ const claude = require("./providers/claude");
 const codex = require("./providers/codex");
 const herdr = require("./herdr");
 const installer = require("./install");
+const { windowTokens } = require("./usage");
 
 const STATUSLINE_PUBLISH_INTERVAL_MS = 15_000;
 
@@ -38,26 +39,42 @@ function inHerdr(env = process.env) {
   return env.HERDR_ENV === "1";
 }
 
-// statusLine fires many times per turn; publish at most once per interval.
-function claimPublishSlot(now) {
-  const stamp = path.join(paths.stateDir(), "last-statusline-publish");
-  try {
-    if (now - fs.statSync(stamp).mtimeMs < STATUSLINE_PUBLISH_INTERVAL_MS) return false;
-  } catch {
-    // no stamp yet
-  }
-  fs.mkdirSync(path.dirname(stamp), { recursive: true });
-  fs.writeFileSync(stamp, "");
-  return true;
+// What the sidebar should show, used to skip publishes that change nothing.
+function signature(states, nowSec) {
+  return JSON.stringify(states.map((s) => windowTokens(s, nowSec).map((t) => t && t.value)));
 }
 
-// The shell Claude Code runs statusLine commands with: Git Bash on Windows
-// (PowerShell without it), the user's shell elsewhere.
-function statusLineShell(env = process.env) {
-  for (const candidate of [env.CLAUDE_CODE_GIT_BASH_PATH, env.SHELL]) {
-    if (candidate && fs.existsSync(candidate)) return candidate;
+function lastPublishPath() {
+  return path.join(paths.stateDir(), "last-publish.json");
+}
+
+// statusLine fires many times per turn. Publish when the numbers changed, and
+// otherwise at most once per interval (that also moves the usage row when the
+// owner pane changes).
+function publishDue(sig, now) {
+  const last = installer.readJson(lastPublishPath(), null);
+  return !last || last.signature !== sig || now - last.at >= STATUSLINE_PUBLISH_INTERVAL_MS;
+}
+
+// Publishes and records it only on success, so a cancelled or failed publish
+// is retried on the next statusLine run.
+function publishAndRecord(states, now) {
+  const sig = signature(states, Math.floor(now / 1000));
+  const { failed } = herdr.publish(states);
+  if (failed.length === 0) {
+    fs.mkdirSync(paths.stateDir(), { recursive: true });
+    fs.writeFileSync(lastPublishPath(), JSON.stringify({ signature: sig, at: now }));
   }
-  return process.platform === "win32" ? "powershell.exe" : "/bin/sh";
+}
+
+// The shell Claude Code runs statusLine commands with: `sh -c` on macOS and
+// Linux; Git Bash on Windows, or PowerShell when Git Bash is missing.
+function statusLineShell(env = process.env, platform = process.platform) {
+  if (platform !== "win32") return "/bin/sh";
+  for (const candidate of [env.CLAUDE_CODE_GIT_BASH_PATH, env.SHELL]) {
+    if (candidate && /bash(\.exe)?$/i.test(candidate) && fs.existsSync(candidate)) return candidate;
+  }
+  return "powershell.exe";
 }
 
 // Run the user's previous statusLine, if `install` chained one, and return its output.
@@ -69,12 +86,13 @@ function chainedStatusLine(input) {
       input,
       encoding: "utf8",
       shell: statusLineShell(),
-      timeout: 5000,
+      timeout: 10_000,
       windowsHide: true,
-      stdio: ["pipe", "pipe", "ignore"],
+      stdio: ["pipe", "pipe", "inherit"],
     });
-  } catch {
-    return "";
+  } catch (err) {
+    // A script may print its line and still exit non-zero.
+    return typeof err.stdout === "string" ? err.stdout : "";
   }
 }
 
@@ -97,7 +115,10 @@ function main(command) {
       try {
         const now = Date.now();
         claude.cacheFromStatusLine(JSON.parse(input), paths.claudeCachePath(), Math.floor(now / 1000));
-        if (inHerdr() && claimPublishSlot(now)) herdr.publish(readStates());
+        if (inHerdr()) {
+          const states = readStates();
+          if (publishDue(signature(states, Math.floor(now / 1000)), now)) publishAndRecord(states, now);
+        }
       } catch {
         // degrade silently: the statusLine must keep working
       }
@@ -106,7 +127,7 @@ function main(command) {
     case "codex-hook":
       readStdin();
       try {
-        if (inHerdr()) herdr.publish(readStates());
+        if (inHerdr()) publishAndRecord(readStates(), Date.now());
       } catch {
         // degrade silently: the hook must not block Codex
       }
@@ -123,4 +144,4 @@ function main(command) {
 
 if (require.main === module) main(process.argv[2]);
 
-module.exports = { readStates, statusLineShell };
+module.exports = { readStates, statusLineShell, signature, publishDue, chainedStatusLine };

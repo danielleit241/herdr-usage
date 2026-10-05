@@ -193,10 +193,45 @@ test("reportCommands sets each token with its own TTL, then clears", () => {
   ]);
 });
 
-test("statusLineShell prefers Claude's Git Bash, then SHELL", () => {
+test("statusLineShell matches Claude Code: sh on Unix, Git Bash or PowerShell on Windows", () => {
   const { statusLineShell } = require("../src/cli");
-  const real = process.execPath; // any existing file
-  assert.equal(statusLineShell({ CLAUDE_CODE_GIT_BASH_PATH: real, SHELL: "/nope" }), real);
-  assert.equal(statusLineShell({ SHELL: real }), real);
-  assert.equal(statusLineShell({ SHELL: "/does/not/exist" }), process.platform === "win32" ? "powershell.exe" : "/bin/sh");
+  assert.equal(statusLineShell({ SHELL: process.execPath }, "linux"), "/bin/sh");
+  assert.equal(statusLineShell({ SHELL: "/usr/bin/fish" }, "darwin"), "/bin/sh");
+  const bash = path.join(tmp(), "bash.exe");
+  fs.writeFileSync(bash, "");
+  assert.equal(statusLineShell({ CLAUDE_CODE_GIT_BASH_PATH: bash }, "win32"), bash);
+  assert.equal(statusLineShell({ SHELL: bash }, "win32"), bash);
+  assert.equal(statusLineShell({ SHELL: process.execPath }, "win32"), "powershell.exe");
+  assert.equal(statusLineShell({}, "win32"), "powershell.exe");
+});
+
+function withStateDir(fn) {
+  const dir = tmp();
+  const prev = process.env.HERDR_PLUGIN_STATE_DIR;
+  process.env.HERDR_PLUGIN_STATE_DIR = dir;
+  try {
+    fn(dir);
+  } finally {
+    if (prev === undefined) delete process.env.HERDR_PLUGIN_STATE_DIR;
+    else process.env.HERDR_PLUGIN_STATE_DIR = prev;
+  }
+}
+
+test("chainedStatusLine keeps the output of a script that exits non-zero", () => {
+  const { chainedStatusLine } = require("../src/cli");
+  withStateDir((dir) => {
+    fs.writeFileSync(path.join(dir, "claude-statusline-chain.json"), JSON.stringify({ command: "echo line; exit 1" }));
+    assert.equal(chainedStatusLine("{}").trim(), "line");
+  });
+});
+
+test("publishDue publishes on change, otherwise once per interval", () => {
+  const { publishDue } = require("../src/cli");
+  withStateDir((dir) => {
+    assert.equal(publishDue("a", 1000), true);
+    fs.writeFileSync(path.join(dir, "last-publish.json"), JSON.stringify({ signature: "a", at: 1000 }));
+    assert.equal(publishDue("a", 2000), false);
+    assert.equal(publishDue("b", 2000), true);
+    assert.equal(publishDue("a", 16_000), true);
+  });
 });

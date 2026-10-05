@@ -1,0 +1,19 @@
+# `herdr plugin install danielleit241/herdr-usage` checks out the default branch.
+# The default branch is `release`, so it must only ever point at a published release.
+name: release-branch
+on:
+  release:
+    types: [published]
+permissions:
+  contents: write
+jobs:
+  move:
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+      # Fast-forward only: a release older than the current `release` branch fails here.
+      - run: git push origin "HEAD:refs/heads/release"

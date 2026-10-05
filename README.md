@@ -1,5 +1,14 @@
 # herdr-usage
 
+<p>
+  <img src="assets/claude.svg" alt="Claude Code" height="32">
+  &nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/codex-dark.svg">
+    <img src="assets/codex.svg" alt="Codex" height="32">
+  </picture>
+</p>
+
 A [herdr](https://github.com/herdrdev/herdr) plugin that shows your **Claude Code** and
 **Codex** subscription usage (5-hour and weekly windows) in the agents sidebar, once per
 provider, colored by level:
@@ -40,8 +49,8 @@ Codex rollout files ────┘                          └─ $herdr_usage
   `$herdr_usage_2`) with `herdr pane report-metadata`, only on the first agent pane of each
   provider in `herdr agent list` order, and clears them on the other panes. Each token
   has a TTL that ends at its window reset, so stale numbers disappear by themselves.
-- **Refresh** comes from the agents: the Claude statusLine (throttled to once per 15 s)
-  and the Codex `Stop` hook. On Linux/macOS a herdr startup hook and a
+- **Refresh** comes from the agents: the Claude statusLine (when the numbers change,
+  otherwise at most every 15 s) and the Codex `Stop` hook. On Linux/macOS a herdr startup hook and a
   `pane.agent_detected` hook also refresh immediately. Windows skips herdr hooks because
   every console process started from one flashes a Windows Terminal window.
 
@@ -58,6 +67,11 @@ Requirements: herdr 0.9.0+ and Node.js 18+ on `PATH`.
    herdr plugin install danielleit241/herdr-usage
    ```
 
+   This installs the latest release: herdr checks out the repository's default branch,
+   which is `release` and only moves when a version is published. Development happens
+   on `main`. To pin a version, add `--ref v0.1.0`. To update, run the same command
+   again.
+
 2. Wire the agent hooks:
 
    ```sh
@@ -65,9 +79,11 @@ Requirements: herdr 0.9.0+ and Node.js 18+ on `PATH`.
    ```
 
    This edits `~/.claude/settings.json` (`statusLine`) and `~/.codex/hooks.json`
-   (`Stop` hook). The first edit keeps the original as `*.herdr-usage.bak`. An existing
-   Claude statusLine keeps working: herdr-usage runs it with the same shell Claude Code
-   uses and prints its output.
+   (`Stop` hook). The first edit keeps the original next to it as
+   `settings.json.herdr-usage.bak` / `hooks.json.herdr-usage.bak`. A tool whose config
+   directory does not exist is skipped. An existing Claude statusLine keeps working:
+   herdr-usage runs it with the shell Claude Code uses (`sh` on macOS/Linux, Git Bash or
+   PowerShell on Windows) and prints its output.
 
    - Codex runs `hooks.json` only with `[features] hooks = true` in
      `~/.codex/config.toml`. `herdr integration install codex` sets it; the action warns
@@ -146,17 +162,17 @@ herdr plugins run as your user without a sandbox (see herdr's
 [plugin trust model](https://herdr.dev/docs/plugins/#trust-and-security)). This is
 everything herdr-usage does:
 
-- **Reads** the Claude Code statusLine JSON on stdin, and only the `rate_limits` lines
-  in the tail of your newest Codex rollout files. It never reads, stores or logs
-  conversation content, credentials or OAuth tokens.
-- **Writes** its cache and backups only to herdr's plugin state directory
-  (`HERDR_PLUGIN_STATE_DIR`), plus the two hook entries described in
+- **Reads** the Claude Code statusLine JSON on stdin, and the last 512 KB of your newest
+  Codex rollout files. From those it keeps only `rate_limits`. It never stores or logs
+  conversation content, and never reads credentials or OAuth tokens.
+- **Writes** its cache to herdr's plugin state directory (`HERDR_PLUGIN_STATE_DIR`),
+  plus the two hook entries and their one-time `*.herdr-usage.bak` backups described in
   [Install](#install). It does not write to the plugin checkout or to herdr's config.
 - **Network**: none. All data is local.
 - **herdr**: uses the public CLI only (`agent list`, `pane report-metadata` with its own
   `--source herdr-usage`). Tokens are display-only, expire by TTL and are not
-  persisted across a server restart. The Claude statusLine publishes at most once per
-  15 s.
+  persisted across a server restart. The Claude statusLine publishes when the numbers
+  change, and otherwise at most once per 15 s.
 - **Commands**: herdr calls run with `execFile` (no shell). The only shell command is
   your own previous Claude statusLine, which herdr-usage runs exactly as Claude Code did
   before.
@@ -173,4 +189,5 @@ herdr plugin action invoke herdr-usage.install-hooks
 
 ## License
 
-MIT
+MIT. Claude is a trademark of Anthropic, and Codex of OpenAI; the icons in `assets/`
+only identify the supported tools. This project is not affiliated with either company.

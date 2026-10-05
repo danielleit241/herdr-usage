@@ -4,6 +4,9 @@
   "private": true,
   "description": "Claude Code + Codex usage (5h / weekly) in the herdr agents sidebar.",
   "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/danielleit241/herdr-usage.git" },
+  "homepage": "https://github.com/danielleit241/herdr-usage#readme",
+  "bugs": { "url": "https://github.com/danielleit241/herdr-usage/issues" },
   "engines": { "node": ">=18" },
   "scripts": {
     "test": "node --test"

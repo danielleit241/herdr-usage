@@ -17,6 +17,8 @@ function sandbox({ claude, codex } = {}) {
     claude: path.join(env.CLAUDE_CONFIG_DIR, "settings.json"),
     codex: path.join(env.CODEX_HOME, "hooks.json"),
   };
+  fs.mkdirSync(env.CLAUDE_CONFIG_DIR, { recursive: true });
+  fs.mkdirSync(env.CODEX_HOME, { recursive: true });
   for (const [key, value] of Object.entries({ claude, codex })) {
     if (value === undefined) continue;
     fs.mkdirSync(path.dirname(files[key]), { recursive: true });
@@ -65,11 +67,41 @@ test("uninstall removes only our hooks", () => {
   assert.deepEqual(read("codex").hooks, herdrSessionStart);
 });
 
-test("install refuses to overwrite an unparsable file", () => {
+test("install refuses to overwrite an unparsable file and still installs the other tool", () => {
+  const { env, read } = sandbox();
+  const settings = path.join(env.CLAUDE_CONFIG_DIR, "settings.json");
+  fs.writeFileSync(settings, "{ not json");
+  const lines = install(env);
+  assert.match(lines[0], /^claude: error: cannot parse/);
+  assert.equal(fs.readFileSync(settings, "utf8"), "{ not json");
+  assert.match(read("codex").hooks.Stop[0].hooks[0].command, /codex-hook$/);
+});
+
+test("install skips a tool that is not installed", () => {
   const { env } = sandbox();
-  fs.mkdirSync(env.CLAUDE_CONFIG_DIR, { recursive: true });
-  fs.writeFileSync(path.join(env.CLAUDE_CONFIG_DIR, "settings.json"), "{ not json");
-  assert.throws(() => install(env), /cannot parse/);
+  fs.rmSync(env.CODEX_HOME, { recursive: true });
+  assert.match(install(env).join("\n"), /codex: skipped/);
+  assert.equal(fs.existsSync(env.CODEX_HOME), false);
+});
+
+test("install leaves foreign Codex Stop groups untouched", () => {
+  const foreign = [{ matcher: "x" }, { hooks: [] }, { hooks: [{ type: "command", command: "other-tool codex-hook" }] }];
+  const { env, read } = sandbox({ codex: { hooks: { Stop: foreign } } });
+  install(env);
+  assert.deepEqual(read("codex").hooks.Stop.slice(0, 3), foreign);
+  uninstall(env);
+  assert.deepEqual(read("codex").hooks.Stop, foreign);
+});
+
+test("install keeps a symlinked settings file a symlink", { skip: process.platform === "win32" }, () => {
+  const { env } = sandbox();
+  const real = path.join(env.CLAUDE_CONFIG_DIR, "real.json");
+  const link = path.join(env.CLAUDE_CONFIG_DIR, "settings.json");
+  fs.writeFileSync(real, "{}");
+  fs.symlinkSync(real, link);
+  install(env);
+  assert.equal(fs.lstatSync(link).isSymbolicLink(), true);
+  assert.match(JSON.parse(fs.readFileSync(real, "utf8")).statusLine.command, /claude-statusline$/);
 });
 
 test("install repoints hooks left by another plugin directory", () => {
@@ -136,7 +168,7 @@ test("install drops a stale duplicate Codex hook", () => {
 
 test("a non-array hooks.Stop is reported, not crashed on", () => {
   const { env } = sandbox({ codex: { hooks: { Stop: {} } } });
-  assert.throws(() => install(env), /hooks\.Stop is not an array/);
+  assert.match(install(env).join("\n"), /codex: error: .*hooks\.Stop is not an array/);
 });
 
 test("install notes when Codex hooks are not enabled", () => {

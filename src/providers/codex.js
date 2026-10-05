@@ -10,7 +10,7 @@ const path = require("node:path");
 const { unavailable, windowLabel, toWindow } = require("../usage");
 
 const TAIL_BYTES = 512 * 1024;
-const DAY_DIRS = 2; // a session started yesterday may still be the newest writer
+const DAY_DIRS = 7; // a long session keeps writing to the folder of the day it started
 const MAX_READS = 3;
 const MAIN_LIMIT_ID = "codex";
 

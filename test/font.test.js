@@ -8,6 +8,7 @@ const { fontDir, installFont, uninstallFont, WIN_FONT_NAME } = require("../src/f
 const { ICONS } = require("../src/herdr");
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "herdr-usage-font-"));
+const installed = (dir) => fs.readdirSync(dir).filter((n) => n.startsWith("HerdrUsageIcons"));
 
 test("fontDir uses the per-user font folder of each platform", () => {
   const home = path.join("h");
@@ -17,36 +18,42 @@ test("fontDir uses the per-user font folder of each platform", () => {
   assert.equal(fontDir({ LOCALAPPDATA: "l" }, "win32"), path.join("l", "Microsoft", "Windows", "Fonts"));
 });
 
-test("installFont copies the font and refreshes fontconfig on Linux", () => {
+test("installFont copies the font under a hashed name and refreshes fontconfig on Linux", () => {
   const env = { HOME: tmp() };
+  const dir = fontDir(env, "linux");
   const calls = [];
   installFont(env, "linux", (file, args) => calls.push([file, ...args]));
-  const target = path.join(fontDir(env, "linux"), "HerdrUsageIcons.ttf");
-  assert.ok(fs.statSync(target).size > 0);
-  assert.deepEqual(calls, [["fc-cache", "-f", path.dirname(target)]]);
+  const files = installed(dir);
+  assert.equal(files.length, 1);
+  assert.match(files[0], /^HerdrUsageIcons-[0-9a-f]{8}\.ttf$/);
+  assert.deepEqual(calls, [["fc-cache", "-f", dir]]);
   uninstallFont(env, "linux", () => {});
-  assert.equal(fs.existsSync(target), false);
+  assert.deepEqual(installed(dir), []);
 });
 
-test("installFont registers the font for the user on Windows", () => {
+test("installFont on Windows replaces older installs and registers the new file", () => {
   const env = { LOCALAPPDATA: tmp() };
   const calls = [];
   const exec = (file, args, extra) => calls.push({ file, args, extra });
   const dir = fontDir(env, "win32");
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, "HerdrUsageIcons.otf"), "old");
+  for (const old of ["HerdrUsageIcons.otf", "HerdrUsageIcons.ttf", "HerdrUsageIcons-00000000.ttf"]) {
+    fs.writeFileSync(path.join(dir, old), "old");
+  }
+  fs.writeFileSync(path.join(dir, "Other.ttf"), "keep");
   installFont(env, "win32", exec);
-  const target = path.join(dir, "HerdrUsageIcons.ttf");
-  assert.ok(fs.existsSync(target));
-  assert.equal(fs.existsSync(path.join(dir, "HerdrUsageIcons.otf")), false, "0.2.0 font removed");
+  const files = installed(dir);
+  assert.equal(files.length, 1, `left: ${files}`);
+  assert.ok(fs.existsSync(path.join(dir, "Other.ttf")));
+  const target = path.join(dir, files[0]);
   const add = calls.findIndex((c) => c.file === "reg" && c.args[0] === "add");
   assert.ok(calls[add].args.includes(WIN_FONT_NAME) && calls[add].args.includes(target));
   assert.deepEqual(calls[add + 1].extra, { HERDR_USAGE_FONT_OP: "add", HERDR_USAGE_FONT: target });
   calls.length = 0;
   uninstallFont(env, "win32", exec);
-  assert.deepEqual(calls[0].extra, { HERDR_USAGE_FONT_OP: "remove", HERDR_USAGE_FONT: target });
-  assert.deepEqual(calls[1].args.slice(0, 3), ["delete", "HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts", "/v"]);
-  assert.equal(fs.existsSync(target), false);
+  assert.ok(calls.some((c) => c.file === "reg" && c.args[0] === "delete" && c.args.includes(WIN_FONT_NAME)));
+  assert.ok(calls.some((c) => c.extra && c.extra.HERDR_USAGE_FONT_OP === "remove" && c.extra.HERDR_USAGE_FONT === target));
+  assert.deepEqual(installed(dir), []);
 });
 
 test("the shipped font maps every provider icon codepoint", () => {

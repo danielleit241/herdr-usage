@@ -1,9 +1,9 @@
 # herdr-usage
 
 <p>
-  <img src="assets/claude-code.svg" alt="Claude Code" height="32">
+  <img src="assets/claude-color.svg" alt="Claude Code" height="32">
   &nbsp;
-  <img src="assets/codex.svg" alt="Codex" height="32">
+  <img src="assets/codex-color.svg" alt="Codex" height="32">
 </p>
 
 A [herdr](https://github.com/herdrdev/herdr) plugin that shows your **Claude Code** and

@@ -5,19 +5,22 @@
 //   Linux    $XDG_DATA_HOME/fonts (default ~/.local/share/fonts), then fc-cache
 //   Windows  %LOCALAPPDATA%\Microsoft\Windows\Fonts, its HKCU registry entry, then
 //            AddFontResource + WM_FONTCHANGE like the Explorer "Install" command
+//
+// The file is installed under a content-hashed name: a terminal keeps the font
+// it loaded locked, so an update writes a new file instead of overwriting it.
 
 const { execFileSync } = require("node:child_process");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const FILE = "HerdrUsageIcons.ttf";
-const SOURCE = path.join(__dirname, "..", "fonts", FILE);
+const SOURCE = path.join(__dirname, "..", "fonts", "HerdrUsageIcons.ttf");
+// Every font file this plugin has installed: hashed .ttf, and 0.2.0's .otf.
+const OWNED = /^HerdrUsageIcons(-[0-9a-f]{8})?\.(ttf|otf)$/;
 const WIN_FONTS_KEY = "HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
 const WIN_FONT_NAME = "HerdrUsageIcons Regular (TrueType)";
-// Left by 0.2.0, which shipped a CFF font.
-const OLD_FILE = "HerdrUsageIcons.otf";
-const OLD_WIN_FONT_NAME = "HerdrUsageIcons Regular (OpenType)";
+const OLD_WIN_FONT_NAME = "HerdrUsageIcons Regular (OpenType)"; // 0.2.0
 
 // Loads (or unloads) the font in the session and tells running apps that the
 // font list changed. The path comes in through the environment, not the script.
@@ -42,6 +45,19 @@ function fontDir(env = process.env, platform = process.platform) {
   return path.join(env.XDG_DATA_HOME || path.join(home, ".local", "share"), "fonts");
 }
 
+function installedName() {
+  const hash = crypto.createHash("sha256").update(fs.readFileSync(SOURCE)).digest("hex").slice(0, 8);
+  return `HerdrUsageIcons-${hash}.ttf`;
+}
+
+function ownedFiles(dir) {
+  try {
+    return fs.readdirSync(dir).filter((name) => OWNED.test(name));
+  } catch {
+    return [];
+  }
+}
+
 function run(file, args, env) {
   execFileSync(file, args, { stdio: "ignore", windowsHide: true, timeout: 30_000, env: { ...process.env, ...env } });
 }
@@ -61,19 +77,15 @@ function tryExec(fn) {
   }
 }
 
-// Removes one installed font file. Windows keeps a loaded font locked until it
-// is unloaded or the apps using it quit.
-function removeFont(target, platform, exec, regName, lines) {
-  if (platform === "win32") {
-    tryExec(() => winFontResource(exec, "remove", target));
-    tryExec(() => exec("reg", ["delete", WIN_FONTS_KEY, "/v", regName, "/f"]));
-  }
-  if (!fs.existsSync(target)) return;
+// Unloads and deletes one font file. A file still locked by a running terminal
+// stays; the next install or uninstall removes it.
+function removeFile(file, platform, exec, lines) {
+  if (platform === "win32") tryExec(() => winFontResource(exec, "remove", file));
   try {
-    fs.rmSync(target, { force: true });
-    lines.push(`font: removed ${target}`);
+    fs.rmSync(file, { force: true });
+    lines.push(`font: removed ${file}`);
   } catch (err) {
-    lines.push(`font: could not remove ${target} (${err.code}); quit the terminal and run this again`);
+    lines.push(`font: ${file} is in use (${err.code}); it is removed on the next run`);
   }
 }
 
@@ -81,12 +93,14 @@ const RESTART = "Fully quit and reopen your terminal app so it loads the font.";
 
 function installFont(env = process.env, platform = process.platform, exec = run) {
   const dir = fontDir(env, platform);
-  const target = path.join(dir, FILE);
+  const name = installedName();
+  const target = path.join(dir, name);
   const lines = [];
-  removeFont(path.join(dir, OLD_FILE), platform, exec, OLD_WIN_FONT_NAME, lines);
+  for (const old of ownedFiles(dir)) if (old !== name) removeFile(path.join(dir, old), platform, exec, lines);
   fs.mkdirSync(dir, { recursive: true });
-  fs.copyFileSync(SOURCE, target);
+  if (!fs.existsSync(target)) fs.copyFileSync(SOURCE, target);
   if (platform === "win32") {
+    tryExec(() => exec("reg", ["delete", WIN_FONTS_KEY, "/v", OLD_WIN_FONT_NAME, "/f"]));
     exec("reg", ["add", WIN_FONTS_KEY, "/v", WIN_FONT_NAME, "/t", "REG_SZ", "/d", target, "/f"]);
     tryExec(() => winFontResource(exec, "add", target));
   } else if (platform !== "darwin") {
@@ -99,8 +113,12 @@ function installFont(env = process.env, platform = process.platform, exec = run)
 function uninstallFont(env = process.env, platform = process.platform, exec = run) {
   const dir = fontDir(env, platform);
   const lines = [];
-  removeFont(path.join(dir, FILE), platform, exec, WIN_FONT_NAME, lines);
-  removeFont(path.join(dir, OLD_FILE), platform, exec, OLD_WIN_FONT_NAME, lines);
+  if (platform === "win32") {
+    for (const regName of [WIN_FONT_NAME, OLD_WIN_FONT_NAME]) {
+      tryExec(() => exec("reg", ["delete", WIN_FONTS_KEY, "/v", regName, "/f"]));
+    }
+  }
+  for (const file of ownedFiles(dir)) removeFile(path.join(dir, file), platform, exec, lines);
   if (platform !== "win32" && platform !== "darwin") tryExec(() => exec("fc-cache", ["-f", dir]));
   return lines.length ? lines : ["font: not installed"];
 }

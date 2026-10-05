@@ -5,8 +5,8 @@
 """Build fonts/HerdrUsageIcons.ttf from assets/*.svg.
 
 Each logo becomes one single-color glyph in the Unicode Private Use Area. All
-paths of a logo are combined with the even-odd rule, so a filled shape on top of
-a background is cut out of it (the Codex cloud out of its tile). TrueType outlines, because
+paths of a logo, except a white background, are combined with the even-odd rule,
+so inner shapes become holes. TrueType outlines, because
 DirectWrite (Windows Terminal) handles them more reliably than CFF. Adapted from
 adihex/herdr-agent-icons (MIT).
 
@@ -27,11 +27,12 @@ from fontTools.svgLib.path import parse_path
 ROOT = Path(__file__).resolve().parent.parent
 UPM = 1000
 FAMILY = "HerdrUsageIcons"
+WHITE = {"#fff", "#ffffff", "white"}
 # glyph name -> (source SVG, codepoint). Keep in sync with ICONS in src/herdr.js.
 # Top of plane 16, away from other icon fonts that count up from U+100000.
 GLYPHS = {
-    "claude": ("claude-code.svg", 0x10FFE1),
-    "codex": ("codex.svg", 0x10FFE2),
+    "claude": ("claude-color.svg", 0x10FFE1),
+    "codex": ("codex-color.svg", 0x10FFE2),
 }
 
 
@@ -39,7 +40,12 @@ def svg_to_glyph(svg_path):
     root = ET.parse(svg_path).getroot()
     vx, vy, vw, vh = map(float, re.findall(r"-?\d*\.?\d+", root.attrib["viewBox"]))
     s = UPM / max(vw, vh)
-    paths = [el.attrib["d"] for el in root.iter() if el.tag.rsplit("}", 1)[-1] == "path"]
+    # A white path is a separate background (the Codex app tile): leave it out.
+    paths = [
+        el.attrib["d"]
+        for el in root.iter()
+        if el.tag.rsplit("}", 1)[-1] == "path" and el.attrib.get("fill", "").lower() not in WHITE
+    ]
     if not paths:
         raise SystemExit(f"{svg_path}: no <path>")
     shape = pathops.Path(fillType=pathops.FillType.EVEN_ODD)

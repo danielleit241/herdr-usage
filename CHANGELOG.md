@@ -2,6 +2,10 @@
 
 ## 0.2.1 - 2026-10-05
 
+- Logos: Claude starburst (`assets/claude-color.svg`) and the Codex cloud without its
+  white tile (`assets/codex-color.svg`).
+- Font is installed under a content-hashed file name, so an update never fails on a
+  file the terminal keeps locked.
 - README: put `$herdr_usage_icon` in front of `agent`, so the usage row is not cut off.
 - Font is now TrueType (`HerdrUsageIcons.ttf`); on Windows `install-font` also loads it
   and broadcasts the font change, like Explorer "Install". It removes the 0.2.0 `.otf`.

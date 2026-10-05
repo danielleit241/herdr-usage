@@ -79,7 +79,7 @@ the plugin.
 
 This installs the latest release: herdr checks out the repository's default branch,
 which is `release` and only moves when a version is published. Development happens on
-`main`. To pin a version, add `--ref v0.2.1`. To update, run the same command again.
+`main`. To pin a version, add `--ref v0.2.2`. To update, run the same command again.
 
 herdr does not show the output of a build command that succeeds. So the setup writes
 its full report to `<herdr config dir>/plugins/config/herdr-usage/setup.log` and

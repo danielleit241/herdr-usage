@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.2 - 2026-10-05
 
 - Sidebar: each usage window has its own row with its local reset time
   (`○ 5h 38% 19:15`, `○ Wk 19% Mon 19:15`); the weekday shows when the reset is more

@@ -8,7 +8,7 @@
 
 id = "herdr-usage"
 name = "herdr-usage"
-version = "0.2.1"
+version = "0.2.2"
 description = "AI agent subscription usage (5h / weekly) in the agents sidebar, one row per provider (Claude Code, Codex)."
 min_herdr_version = "0.9.3"
 platforms = ["linux", "macos", "windows"]

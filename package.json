@@ -1,6 +1,6 @@
 {
   "name": "herdr-usage",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "AI agent subscription usage (5h / weekly) in the herdr agents sidebar, one row per provider (Claude Code, Codex).",
   "license": "MIT",

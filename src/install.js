@@ -1,8 +1,8 @@
 // Wires herdr-usage into every provider's tool (see src/providers/index.js).
 //
 // Each provider's edits are idempotent, keep the original file as *.herdr-usage.bak,
-// and keep foreign configuration: an existing Claude statusLine is chained, not
-// replaced, and other Codex hooks are left untouched.
+// and keep foreign configuration (for example, Claude's existing statusLine is
+// chained, not replaced).
 
 const fs = require("node:fs");
 const { PROVIDERS } = require("./providers");

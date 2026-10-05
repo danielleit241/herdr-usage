@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Docs: describe herdr-usage as a provider-based plugin. README lists the supported
+  providers (Claude Code, Codex) in one table, and the manifest and package
+  descriptions are provider-neutral.
+
 ## 0.2.1 - 2026-10-05
 
 - Logos: Claude starburst (`assets/claude-color.svg`) and the Codex cloud without its

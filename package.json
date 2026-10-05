@@ -2,7 +2,7 @@
   "name": "herdr-usage",
   "version": "0.2.1",
   "private": true,
-  "description": "Claude Code + Codex usage (5h / weekly) in the herdr agents sidebar.",
+  "description": "AI agent subscription usage (5h / weekly) in the herdr agents sidebar, one row per provider (Claude Code, Codex).",
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/danielleit241/herdr-usage.git" },
   "homepage": "https://github.com/danielleit241/herdr-usage#readme",

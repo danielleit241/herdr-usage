@@ -3,7 +3,8 @@
 ## 0.2.1 - 2026-10-05
 
 - Logos: Claude starburst (`assets/claude-color.svg`) and the Codex cloud without its
-  white tile (`assets/codex-color.svg`), both in the same centered box.
+  white tile (`assets/codex-color.svg`), both the same size and centered in one
+  terminal cell (they used to sit high and spill into the next cell).
 - README: no logo images.
 - Font is installed under a content-hashed file name, so an update never fails on a
   file the terminal keeps locked.

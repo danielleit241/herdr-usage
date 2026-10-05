@@ -27,7 +27,13 @@ from fontTools.svgLib.path import parse_path
 
 ROOT = Path(__file__).resolve().parent.parent
 UPM = 1000
-LOGO_SIZE = UPM * 18 / 24
+# One terminal cell: monospace fonts are about 0.55-0.6 em wide, and their
+# capitals are centered about 0.35 em above the baseline. A terminal draws a
+# fallback glyph on the text baseline, so the logo is centered there, not in the em box.
+ADVANCE = UPM * 0.6
+LOGO_SIZE = UPM * 0.58
+CENTER_X = ADVANCE / 2
+CENTER_Y = UPM * 0.35
 FAMILY = "HerdrUsageIcons"
 WHITE = {"#fff", "#ffffff", "white"}
 # provider id -> {svg, codepoint}; src/herdr.js reads the same file. Codepoints
@@ -59,12 +65,11 @@ def svg_to_glyph(svg_path):
     # Resolve the even-odd overlaps into clean contours that any rasterizer
     # (non-zero winding) fills the same way.
     shape.simplify(fix_winding=True)
-    # Fit the drawn shape, not the SVG's viewBox, into the same centered box,
-    # so every logo has the same size and position. The box keeps the padding of
-    # the 24-unit icon sets (3 units on each side).
+    # Fit the drawn shape, not the SVG's viewBox, into the same box in the
+    # middle of the cell, so every logo has the same size and position.
     x0, y0, x1, y1 = shape.bounds
     k = LOGO_SIZE / max(x1 - x0, y1 - y0)
-    fit = Transform().translate(UPM / 2, UPM / 2).scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2)
+    fit = Transform().translate(CENTER_X, CENTER_Y).scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2)
     out = TTGlyphPen(None)
     # TrueType wants quadratic curves and clockwise outer contours.
     shape.draw(TransformPen(Cu2QuPen(out, max_err=1, reverse_direction=True), fit))
@@ -82,7 +87,7 @@ def main():
     fb.setupGlyphOrder(names)
     fb.setupCharacterMap({0x20: "space", **{cp: name for name, (_, cp) in GLYPHS.items()}})
     fb.setupGlyf(glyphs)
-    fb.setupHorizontalMetrics({n: (UPM, glyphs[n].xMin if hasattr(glyphs[n], "xMin") else 0) for n in names})
+    fb.setupHorizontalMetrics({n: (round(ADVANCE), glyphs[n].xMin if hasattr(glyphs[n], "xMin") else 0) for n in names})
     fb.setupHorizontalHeader(ascent=UPM, descent=0)
     fb.setupNameTable({
         "familyName": FAMILY,
